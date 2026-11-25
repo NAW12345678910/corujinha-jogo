@@ -783,7 +783,13 @@ UI.trace = function (api, host, o) {
     };
     const core = mask('core'), wide = mask('wide'); let coreN = 0; for (const v of core) coreN += v;
     cx.lineCap = 'round'; cx.lineJoin = 'round'; cx.lineWidth = bw;
-    state = { W, H, cx, core, wide, coreN, bw };
+    // Grade de "pedaços" da letra: cada pedaço precisa ser coberto (duas linhas no U não bastam)
+    const cs = Math.max(8, Math.round(bw * k * 1.2)), cw = Math.ceil(c.width / cs), chh = Math.ceil(c.height / cs);
+    const cellCore = new Uint32Array(cw * chh);
+    for (let y = 0; y < c.height; y++) { const row = y * c.width, cr = Math.floor(y / cs) * cw; for (let x = 0; x < c.width; x++) if (core[row + x]) cellCore[cr + Math.floor(x / cs)]++; }
+    const need = []; cellCore.forEach((n, i) => { if (n >= cs * cs * .2) need.push(i); });
+    const redraw = () => { gx.clearRect(0, 0, W, H); paint(gx, 'guide'); };
+    state = { W, H, k, cx, gx, core, wide, coreN, bw, cs, cw, cellCore, need, redraw };
     mbar.style.width = '0';
   }
   const P = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * (state.W / r.width), y: (e.clientY - r.top) * (state.H / r.height) }; };
@@ -793,19 +799,50 @@ UI.trace = function (api, host, o) {
   api2.check = lenient => {
     if (!state || api.locked()) return;
     const d = state.cx.getImageData(0, 0, c.width, c.height).data, core = state.core, wide = state.wide;
+    const { cs, cw, cellCore, need } = state, cellCov = new Uint32Array(cellCore.length);
     let cov = 0, ink = 0, out = 0;
-    for (let i = 0; i < core.length; i++) if (d[i * 4 + 3] > 60) { ink++; if (core[i]) cov++; if (!wide[i]) out++; }
+    for (let y = 0, i = 0; y < c.height; y++) {
+      const cr = Math.floor(y / cs) * cw;
+      for (let x = 0; x < c.width; x++, i++) if (d[i * 4 + 3] > 60) { ink++; if (core[i]) { cov++; cellCov[cr + Math.floor(x / cs)]++; } if (!wide[i]) out++; }
+    }
     const pct = state.coreN ? cov / state.coreN : 0, stray = ink ? out / ink : 0;
-    mbar.style.width = Math.min(100, Math.round(pct / .6 * 100)) + '%';
-    if (pct >= (lenient ? .4 : .6) && stray <= (lenient ? .6 : .38)) return done();
+    const missing = need.filter(i => cellCov[i] / cellCore[i] < .5), cells = need.length ? 1 - missing.length / need.length : 0;
+    // maior "buraco" contínuo de pedaços sem tinta (ex.: a curva de baixo do U quando só há duas retas)
+    const ms = new Set(missing); let hole = 0;
+    for (const s0 of missing) {
+      if (!ms.has(s0)) continue;
+      let size = 0; const stack = [s0]; ms.delete(s0);
+      while (stack.length) {
+        const q = stack.pop(); size++;
+        const qx = q % cw, qy = Math.floor(q / cw);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = qx + dx; if (nx < 0 || nx >= cw) continue;
+          const n = (qy + dy) * cw + nx; if (ms.has(n)) { ms.delete(n); stack.push(n); }
+        }
+      }
+      hole = Math.max(hole, size);
+    }
+    const okCells = cells >= (lenient ? .72 : .9) && hole <= (lenient ? 3 : 2);
+    const prog = Math.min(cells / (lenient ? .72 : .9), okCells ? 1 : .85);
+    mbar.style.width = Math.round(prog * 100) + '%';
+    if (okCells && stray <= (lenient ? .45 : .28) && pct >= .35) return done();
     let t;
     if (!ink) t = 'Siga o tracinho com o dedo 👆';
-    else if (stray > .45) t = 'Vamos seguir o tracinho! Toque na vassourinha e tente de novo.';
-    else if (pct < .25) t = 'Siga o tracinho pontilhado 👆';
-    else t = 'Quase! Falta um pouquinho…';
+    else if (stray > .4) t = 'Vamos seguir o tracinho! Toque na vassourinha e tente de novo.';
+    else if (cells < .3) t = 'Siga o tracinho pontilhado 👆';
+    else {
+      t = 'Quase! Falta um pedacinho — veja a bolinha.';
+      state.redraw();                                        // bolinhas douradas onde ainda falta passar
+      const gx = state.gx; gx.save(); gx.fillStyle = '#ffb020';
+      missing.sort(() => Math.random() - .5).slice(0, 5).forEach(i => {
+        const cx0 = ((i % cw) + .5) * cs / state.k, cy0 = (Math.floor(i / cw) + .5) * cs / state.k;
+        gx.beginPath(); gx.arc(cx0, cy0, Math.max(7, state.bw * .3), 0, 7); gx.fill();
+      });
+      gx.restore();
+    }
     tip(t); if (lenient) api.speak(t.replace(/[👆…]/g, ''));
   };
-  api2.clear = () => { if (!state) return; state.cx.clearRect(0, 0, state.W, state.H); mbar.style.width = '0'; tip('Siga o tracinho com o dedo 👆'); };
+  api2.clear = () => { if (!state) return; state.redraw(); state.cx.clearRect(0, 0, state.W, state.H); mbar.style.width = '0'; tip('Siga o tracinho com o dedo 👆'); };
   c.addEventListener('pointerdown', e => {
     if (api.locked() || !state || drawing || e.button > 0) return;
     drawing = true; pid = e.pointerId; try { c.setPointerCapture(pid); } catch (_) {}
