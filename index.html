@@ -532,7 +532,7 @@ L.stickersUnlocked = () => Math.min(L.data.STICKERS.length, Math.floor(STORE.s.s
 const ss = ('speechSynthesis' in window) ? window.speechSynthesis : null;
 let gen = 0;
 L.tts = {
-  voice: null, ok: false, local: false,
+  voice: null, ok: false, local: false, ms: false,
   init() {
     if (!ss) return;
     const all = ss.getVoices();
@@ -543,6 +543,7 @@ L.tts = {
     const pref = ['Francisca', 'Maria', 'Luciana', 'Thalita', 'Google'];
     this.voice = pref.map(p => pool.find(v => v.name.includes(p))).find(Boolean) || pool[0] || null;
     this.ok = !!this.voice; this.local = loc.length > 0;
+    this.ms = !!this.voice && /microsoft/i.test(this.voice.name);      // vozes Microsoft leem vogais átonas diferente
   },
   /* Fala o texto. Devolve Promise que resolve quando a fala termina (ou é cortada).
      opts: {queue:true → entra na fila sem cortar; rate:número} */
@@ -567,13 +568,9 @@ L.tts = {
     });
   },
   stop() { gen++; if (ss) { try { ss.cancel(); } catch (e) {} } },
-  // Pronúncia: sílabas soltas viram "bá bê bí bô bú" (o TTS erra "be/bo" sem acento)
-  syl(s) {
-    s = s.toLowerCase();
-    const m = { a: 'á', e: 'ê', i: 'í', o: 'ô', u: 'ú' };
-    return (s.length === 2 && m[s[1]]) ? s[0] + m[s[1]] : s;
-  },
-  VOGAL: { A: 'á', E: 'ê', I: 'í', O: 'ó', U: 'ú' }
+  // Pronúncia de sílaba solta: a regra fica em Cora.data.sylSay (dados/palavras.js)
+  syl(s) { return L.data.sylSay ? L.data.sylSay(s) : s.toLowerCase(); },
+  VOGAL: { A: 'á', E: 'é', I: 'i', O: 'ó', U: 'u' }
 };
 if (ss) { L.tts.init(); ss.onvoiceschanged = () => L.tts.init(); }
 
@@ -747,9 +744,12 @@ UI.choices = function (api, host, o) {
 const FONT = '700 {S}px "Andika","Comic Sans MS","Segoe Print","Trebuchet MS",Verdana,sans-serif';
 /* ---- Traçado por TRAÇOS: confere ordem, direção e ponto de partida (letras MAIÚSCULAS e números) ---- */
 let svgNS = null;
-function samplePath(d, sc, ox, oy) {
+function hiddenPath(d) {
   if (!svgNS) { svgNS = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svgNS.setAttribute('width', '0'); svgNS.setAttribute('height', '0'); svgNS.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'; document.body.append(svgNS); }
-  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); svgNS.append(p);
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); svgNS.append(p); return p;
+}
+function samplePath(d, sc, ox, oy) {
+  const p = hiddenPath(d);
   const len = p.getTotalLength(), step = 4 / sc, pts = [];
   for (let l = 0; l < len; l += step) { const q = p.getPointAtLength(l); pts.push([ox + q.x * sc, oy + q.y * sc]); }
   const e = p.getPointAtLength(len); pts.push([ox + e.x * sc, oy + e.y * sc]); p.remove();
@@ -776,12 +776,19 @@ function traceStrokes(api, host, o, chars) {
     for (const cv of [g, p, c]) { cv.width = Math.round(W * k); cv.height = Math.round(H * k); }
     const gx = g.getContext('2d'), px = p.getContext('2d'), cx = c.getContext('2d');
     for (const x of [gx, px, cx]) { x.setTransform(k, 0, 0, k, 0, 0); x.lineCap = 'round'; x.lineJoin = 'round'; }
-    const n = chars.length, sc = (n === 1 ? Math.min(H * .86, W * .86) : Math.min(H * .8, W * .94 / n)) / 100;
-    const oy = (H - 100 * sc) / 2, strokes = []; let total = 0;
-    chars.forEach((ch, i) => {
-      const ox = (W - n * 100 * sc) / 2 + i * 100 * sc;
-      L.data.STROKES[ch].forEach((d, si) => { const pts = samplePath(d, sc, ox, oy); strokes.push({ pts, num: si + 1 }); total += pts.length; });
+    const items = []; let X = 0, minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
+    chars.forEach(ch => {                                       // cada letra avança na linha (minúsculas são mais estreitas)
+      L.data.STROKES[ch].forEach((d, si) => {
+        const b = hiddenPath(d); const bb = b.getBBox(); b.remove();
+        minx = Math.min(minx, bb.x + X); maxx = Math.max(maxx, bb.x + bb.width + X); miny = Math.min(miny, bb.y); maxy = Math.max(maxy, bb.y + bb.height);
+        items.push({ d, X, num: si + 1 });
+      });
+      X += /[a-z]/.test(ch) ? 78 : 100;
     });
+    const bwU = Math.max(1, maxx - minx), bhU = Math.max(1, maxy - miny);
+    const sc = Math.min(W * .88 / bwU, H * .8 / bhU), bx = (W - bwU * sc) / 2 - minx * sc, oy = (H - bhU * sc) / 2 - miny * sc;
+    const strokes = []; let total = 0;
+    items.forEach(it => { const pts = samplePath(it.d, sc, bx + it.X * sc, oy); strokes.push({ pts, num: it.num }); total += pts.length; });
     const bw = Math.max(16, Math.min(42, sc * 13));
     st = { W, H, k, gx, px, cx, strokes, cur: 0, pi: 0, bw, tol: bw * .95, startR: Math.max(32, bw * 1.5), total, doneBase: 0, mbarN: 0 };
     px.lineWidth = bw * .9;
@@ -863,6 +870,7 @@ function traceStrokes(api, host, o, chars) {
   const up = e => {
     if (!drawing || e.pointerId !== pid) return; drawing = false; pid = null; lastAct = performance.now();
     if (st) st.cx.clearRect(0, 0, st.W, st.H);
+    if (mode === 'ok' && st && st.cur < st.strokes.length && st.strokes[st.cur].pts.length <= 8) { strokeDone(); mode = 'off'; return; }   // pingo do i/j: um toque
     if (mode === 'ok' && st && st.cur < st.strokes.length && st.pi > 0) tip('Continue de onde parou 👆');
     mode = 'off';
   };
@@ -1042,8 +1050,10 @@ L.register = function (g) {
 };
 L.level = id => { const g = L.games[id]; return U.clamp(ST.game(id).lvl, 0, g.levels.length - 1); };
 
-const PRAISE = ['Muito bem', 'Isso mesmo', 'Parabéns', 'Você é demais', 'Arrasou', 'Que legal', 'Boa'];
-const praise = () => `${U.rnd(PRAISE)}, ${ST.s.name}!`;
+// elogio curto a cada acerto, SEM o nome (o nome e o "Parabéns" ficam para o fim do ciclo)
+const PRAISE = ['Muito bem', 'Isso mesmo', 'Acertou', 'Legal'];
+let lastPraise = '';
+const praise = () => { let p; do { p = U.rnd(PRAISE); } while (p === lastPraise); lastPraise = p; return p + '!'; };
 
 /* ---------- sessão ---------- */
 L.play = function (id, o) {
@@ -1069,7 +1079,7 @@ function buildFrame(S) {
   const sc = h('div', { class: 'stars-badge', id: 'sc', 'aria-label': 'Estrelas' }, '⭐ ' + ST.s.stars);
   const dots = h('div', { class: 'dots', id: 'dots', role: 'progressbar' });
   const mute = h('button', { class: 'b3 round small c-white', 'aria-label': 'Som', onclick: () => { ST.s.sound = !ST.s.sound; ST.save(); mute.textContent = ST.s.sound ? '🔊' : '🔇'; } }, ST.s.sound ? '🔊' : '🔇');
-  const home = UI.hold(h('button', { class: 'b3 round c-white', 'aria-label': 'Sair (segure)' }, '🏠'), 900, () => L.screens.menu(), 'Segure o botão para sair');
+  const home = h('button', { class: 'b3 round c-white', 'aria-label': 'Voltar ao menu', onclick: () => L.screens.menu() }, '🏠');
   S.host = h('div', { class: 'stage g-' + S.game.id });
   L.screens.mount(h('div', { class: 'screen t-' + S.game.color }, h('div', { class: 'topbar' }, home, dots, sc, mute), S.host));
   drawDots();
@@ -1263,7 +1273,8 @@ SC.final = function (r) {
     h('div', { class: 'bigstars' }, '⭐'.repeat(Math.min(n, 15)) || '🌟'),
     h('p', {}, `${n} estrela${n === 1 ? '' : 's'}`), sticker,
     h('div', { class: 'row' }, UI.btn('🔁', 'c-pink big', again, 'Jogar de novo'), UI.btn('🏠', 'c-blue big', () => SC.menu(), 'Menu')))));
-  L.tts.say(`Parabéns, ${ST.s.name}! Você ganhou ${n} ${n === 1 ? 'estrela' : 'estrelas'}!`);
+  const NW = ['nenhuma', 'uma', 'duas', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze', 'catorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove', 'vinte'];
+  L.tts.say(`Parabéns, ${ST.s.name}! Você ganhou ${n <= 20 ? NW[n] : n} ${n === 1 ? 'estrela' : 'estrelas'}!`);
 };
 
 /* ---------- painel dos pais ---------- */
@@ -1478,7 +1489,7 @@ const RHYMES = {};
 WORDS.forEach(x => { if (x.rh) (RHYMES[x.rh] = RHYMES[x.rh] || []).push(x); });
 D.RHYMES = RHYMES;
 
-/* palavras do mundo da lua (pseudopalavras só com sílabas simples; nada que seja palavra real) */
+/* palavras inventadas (pseudopalavras só com sílabas simples; nada que seja palavra real) */
 const EXTRA = new Set(`AGUA ALMA ALTA ALTO AMAR AMOR ANEL ANO ANTA ARCO AREA ARMA ARTE ASA ASNO ATUM AULA AVE AVO AZUL
 BABA BAGA BAIA BAILE BAIXO BALA BALDE BANCO BANDA BANHO BARBA BARCO BARRA BARRO BASE BATE BEBE BEBER BEIJO BELA BELO BEM BICA BICO BICHO BILHA BOA BOBO BOCA BODE BOI BOIA BOLA BOLO BOLSA BOM BOMBA BONE BORDA BOTA BOTE BRAVO BRAÇO BRISA BRUXA BULA BULE BURRO BUSCA
 CABO CABRA CACA CADA CAIR CAIXA CALA CALMA CALO CAMA CAMPO CANA CANO CANTO CAPA CARA CARO CARTA CASA CASO CAUSA CEDO CEGO CELA CENA CERA CERCA CESTA CHAO CHAVE CHEFE CHEIO CHIA CHIP CHUVA CIMA CINCO CINTA CIRCO CLARO COBRA COCO COICE COISA COLA COLAR COLHER COMA COMER CONTA COPA COPO COR CORDA CORPO CORTE COSTA COURO COZER CRIA CRU CUBO CUECA CURA CURSO CURVA
@@ -1499,7 +1510,7 @@ BUFA BUFO BOBA BOBE FIFA FOFA FOFO LOLA LUTO MOLE MOFA NANA NENE NINA PAPO PAPI 
 WORDS.forEach(x => EXTRA.add(strip(x.w).toUpperCase()));
 D.isWord = s => EXTRA.has(strip(s).toUpperCase());
 
-const PS = 'TU-MA LI-PE NA-FO DU-BE VE-BI PO-FA LO-MI PA-DU SU-FE FO-LU BI-MA TE-PU MI-FA LA-VU FI-BO DE-SI TA-PI-FO DO-MU-BI FE-LO-PA NI-BA-PU';
+const PS = 'TU-MA FU-BI NA-FO TU-FE VE-BI PO-FA NO-FE PA-DU SU-FE FO-LU BI-MA TE-PU MI-FA LA-VU FI-BO MI-FE TA-PI-FO DO-MU-BI FE-LO-PA NI-BA-PU';
 D.PSEUDO = PS.split(' ').map(x => ({ w: x.replace(/-/g, ''), s: x.split('-') })).filter(x => !EXTRA.has(x.w));
 
 /* ---------- letras ---------- */
@@ -1543,13 +1554,22 @@ const SCONF = ['BPDT', 'FV', 'MN', 'SZ', 'CG'];
 D.sconf = (a, b) => a === b || SCONF.some(g => g.includes(a) && g.includes(b));
 
 /* ---------- pronúncia ---------- */
-const VS = { a:'á', e:'ê', i:'í', o:'ô', u:'ú' };
-// sílaba solta → texto que o TTS lê certo ("be" → "bê", "pra" → "prá", "que" → "quê")
+const VS = { a:'á', e:'ê', i:'i', o:'ô', u:'ú' };
+// sílaba solta → texto que o TTS lê certo. Convenção: bá bê bi bô bu  (vozes Microsoft: bó, í e ú em alguns casos)
+const FIX = { ves:'vês', vas:'vaz', ran:'rã', man:'mã', den:'dên', tas:'tás', es:'és', nal:'nál', nos:'nós', 'ça':'sá', 'ço':'sô', 'çu':'su', 'çã':'sã', 'ção':'são', gio:'jio' };
+const MSFIX = { er:'ér', il:'íl', ol:'ól', ul:'úl', us:'ús', im:'ím', un:'ún' };
 D.sylSay = s => {
-  s = s.toLowerCase();
-  if (s.length === 1 && VS[s]) return VS[s];
-  if (/^(qu|gu)[aeio]$/.test(s)) return s.slice(0, 2) + VS[s[2]];
-  if (/^[^aeiouáéíóúâêôãõç]+[aeiou]$/.test(s)) return s.slice(0, -1) + VS[s[s.length - 1]];
+  s = s.toLowerCase(); const ms = L.tts.ms; let m;
+  if (FIX[s]) return FIX[s]; if (ms && MSFIX[s]) return MSFIX[s];
+  if (/^[aeiou]$/.test(s)) return { a:'á', e:'ê', i:'i', o:'ô', u:'u' }[s];
+  if ((m = s.match(/^h([aeiou])$/))) return D.sylSay(m[1]);                  // H mudo: ho he hi
+  if (ms && /.ô$/.test(s)) return s.slice(0, -1) + 'ó';                       // BÔ de ROBÔ
+  if ((m = s.match(/^(qu|gu|ch|lh|nh|[bcdfgjklmnprstvxz]|[bcdfgpt][lr]|vr)([aeiou])$/))) {
+    const c = m[1], v = m[2];
+    if (v === 'a') return c + 'á'; if (v === 'e') return c + 'ê';
+    if (v === 'i') return c + (ms ? 'í' : 'i'); if (v === 'o') return c + (ms ? 'ó' : 'ô');
+    return c + (ms && /^(p|r|x|nh)$/.test(c) ? 'ú' : 'u');
+  }
   return s;
 };
 D.wordSay = w => (BYW[w] ? BYW[w].say : w.toLowerCase());
@@ -1614,7 +1634,36 @@ const S = L.data.STROKES = {
   '6': ['M68 10 C36 20 22 46 24 68 C26 100 78 100 76 68 C74 38 30 38 24 62'],
   '7': ['M22 8 L78 8 L40 92'],
   '8': ['M50 48 C20 48 22 8 50 8 C78 8 80 48 50 48 C16 48 18 92 50 92 C82 92 84 48 50 48'],
-  '9': ['M72 38 C72 6 26 6 26 32 C26 60 72 62 72 38 C72 70 62 92 36 92']
+  '9': ['M72 38 C72 6 26 6 26 32 C26 60 72 62 72 38 C72 70 62 92 36 92'],
+
+  /* minúsculas (letra de forma): linha de base y=76, altura do "x" y=36, haste de cima y=4, haste de baixo y=100.
+     "a" e "g" de um andar, como no caderno de alfabetização. Pingos (i, j) são um traço curtinho. */
+  a: ['M72 50 C66 34 28 32 28 56 C28 80 66 82 72 62', 'M72 36 L72 76'],
+  b: ['M30 4 L30 76', 'M30 50 C40 32 74 34 74 56 C74 80 40 82 30 62'],
+  c: ['M72 46 C62 32 28 34 28 56 C28 80 62 82 72 66'],
+  d: ['M72 50 C66 34 28 32 28 56 C28 80 66 82 72 62', 'M72 4 L72 76'],
+  e: ['M28 56 L74 56 C74 36 30 30 28 56 C26 82 62 84 74 68'],
+  f: ['M64 14 C54 2 40 6 40 24 L40 76', 'M24 38 L62 38'],
+  g: ['M72 50 C66 34 28 32 28 56 C28 80 66 82 72 62', 'M72 36 L72 88 C72 104 40 104 28 92'],
+  h: ['M30 4 L30 76', 'M30 52 C38 32 72 32 72 54 L72 76'],
+  i: ['M50 36 L50 76', 'M50 14 L50 20'],
+  j: ['M54 36 L54 88 C54 104 36 104 26 94', 'M54 14 L54 20'],
+  k: ['M30 4 L30 76', 'M70 36 L30 62', 'M44 52 L72 76'],
+  l: ['M50 4 L50 76'],
+  m: ['M22 36 L22 76', 'M22 52 C26 32 50 32 50 52 L50 76', 'M50 52 C54 32 80 32 80 52 L80 76'],
+  n: ['M30 36 L30 76', 'M30 52 C38 32 72 32 72 54 L72 76'],
+  o: ['M50 34 C20 34 20 78 50 78 C80 78 80 34 50 34'],
+  p: ['M30 36 L30 100', 'M30 50 C40 32 74 34 74 56 C74 80 40 82 30 62'],
+  q: ['M72 50 C66 34 28 32 28 56 C28 80 66 82 72 62', 'M72 36 L72 100'],
+  r: ['M34 36 L34 76', 'M34 54 C38 36 56 32 70 38'],
+  s: ['M70 42 C62 32 30 32 32 48 C34 62 68 56 70 70 C72 84 34 84 28 72'],
+  t: ['M44 12 L44 66 C44 76 56 80 70 72', 'M26 38 L64 38'],
+  u: ['M30 36 L30 60 C30 82 72 82 72 58', 'M72 36 L72 76'],
+  v: ['M24 36 L50 76 L76 36'],
+  w: ['M14 36 L32 76 L50 46 L68 76 L86 36'],
+  x: ['M28 36 L72 76', 'M72 36 L28 76'],
+  y: ['M26 36 L50 74', 'M74 36 L40 100'],
+  z: ['M28 36 L72 36 L28 76 L72 76']
 };
 })();
 
@@ -1695,7 +1744,7 @@ L.register({
       box = UI.choices(api, host, {
         opts: it.opts, label: o => T(o), cls: 'let', isRight: o => o === it.L,
         onRight: () => { pic.textContent = a.e; pic.setAttribute('aria-label', wordLabel(a)); api.speak(`${nm} de ${a.say}!`); },
-        onWrong: o => api.speak(`Essa é a letra ${lt(o)}. Tente outra!`)
+        onWrong: o => api.speak(`Essa é a letra ${lt(o)}. Tente de novo!`)
       });
     } else {
       UI.ask(api, host, { text: 'Com que letra começa?', say: `Com que letra começa ${a.say}?` });
@@ -1703,7 +1752,7 @@ L.register({
       box = UI.choices(api, host, {
         opts: it.opts, label: o => T(o), cls: 'let', isRight: o => o === it.L,
         onRight: () => api.speak(`${nm} de ${a.say}!`),
-        onWrong: o => api.speak(`Essa é a letra ${lt(o)}. Tente outra!`)
+        onWrong: o => api.speak(`Essa é a letra ${lt(o)}. Tente de novo!`)
       });
     }
     if (box && it.opts.length === 4) box.classList.add('n4');
@@ -1771,7 +1820,7 @@ L.register({
         if (it.ex) { pic.textContent = it.ex.e; pic.setAttribute('aria-label', wordLabel(it.ex)); api.speak(`${say}! ${say} de ${it.ex.say}`); }
         else api.speak(`${say}!`);
       },
-      onWrong: o => api.speak(`Essa é a sílaba ${ss(o)}. Tente outra!`)
+      onWrong: o => api.speak(`Essa é a sílaba ${ss(o)}. Tente de novo!`)
     });
   }
 });
@@ -1783,7 +1832,7 @@ L.register({
   id: 'ler', title: 'Vamos ler', icon: '📖', color: 'blue', area: 'letras',
   levels: ['Palavras curtas e longas'], n: 6,
   items(level, n) {
-    // mistura de tamanhos: curtas (1-2 sílabas), médias (3) e longas (4 ou mais); 1 "palavra do mundo da lua" quando dá
+    // mistura de tamanhos: curtas (1-2 sílabas), médias (3) e longas (4 ou mais); 1 "palavra inventada" quando dá
     const np = n >= 5 ? 1 : 0, rest = n - np, a = Math.ceil(rest / 3), lg = Math.ceil((rest - a) / 2), md = rest - a - lg;
     const grp = [[x => x.n <= 2, a], [x => x.n >= 4, lg], [x => x.n === 3, md]];
     const ws = grp.flatMap(([f, k]) => k > 0 ? L.srs.pick(D.READ.filter(f), k, x => 'ler:' + x.w) : [])
@@ -1794,9 +1843,9 @@ L.register({
   render(it, host, api) {
     const alive = () => api.item() === it && host.isConnected;
     UI.ask(api, host, it.pseudo
-      ? { text: 'Palavra do mundo da lua!', say: 'Esta é uma palavra do mundo da lua! Toque em cada pedacinho para ler.' }
+      ? { text: 'Palavra inventada!', say: 'Esta palavra é inventada! Toque em cada pedacinho para ler.' }
       : { text: 'Toque e leia!', say: 'Vamos ler! Toque em cada pedacinho.' });
-    if (it.pseudo) host.append(h('div', { class: 'moonchip' }, '🌙 palavra do mundo da lua'));
+    if (it.pseudo) host.append(h('div', { class: 'moonchip' }, '🌙 palavra inventada'));
     const row = h('div', { class: 'syls' }), seen = new Set(); let done = false;
     const btns = it.s.map((s, i) => {
       const b = h('button', { class: 'b3 syl ' + COL[i % 4], 'aria-label': 'sílaba ' + low(s) }, T(s));
@@ -1816,7 +1865,7 @@ L.register({
       row.classList.add('whole'); btns.forEach(b => b.classList.add('seen'));
       prize.textContent = it.e; prize.classList.add('open'); prize.setAttribute('aria-label', it.pseudo ? 'extraterrestre' : low(it.w));
       prize.onclick = () => api.speak(it.say);
-      api.speak(it.pseudo ? `${it.say}. Uma palavra do mundo da lua!` : it.say, { queue: true });
+      api.speak(it.pseudo ? `${it.say}. Uma palavra inventada!` : it.say, { queue: true });
       api.correct({ manual: true });
     }
   }
@@ -1850,7 +1899,7 @@ L.register({
     UI.choices(api, host, {
       opts: it.opts, label: o => T(o), cls: 'wrd', isRight: o => o === it.w,
       onRight: () => api.speak(`${D.wordSay(it.w)}!`),
-      onWrong: o => api.speak(`Essa palavra é ${D.wordSay(o)}. Tente outra!`)
+      onWrong: o => api.speak(`Essa palavra é ${D.wordSay(o)}. Tente de novo!`)
     });
     host.append(h('div', { class: 'row' }, UI.btn('💡', 'c-yellow round small', hear, 'Ouvir a pergunta')));
   }
@@ -1872,7 +1921,7 @@ function assemble(api, host, it, o) {
     api.helped(); clearHint();
     const t = tiles.find(x => !x.used && x.p.t === need[pos0.v]);
     if (t) t.b.classList.add('hint');
-    api.speak(`Procure ${o.say(need[pos0.v])}.`);
+    api.speak(`Procure ${o.unit} ${o.say(need[pos0.v])}.`);
   }
   tiles.forEach(x => {
     x.b.onclick = () => {
@@ -1887,7 +1936,7 @@ function assemble(api, host, it, o) {
       } else {
         x.b.classList.add('no'); api.later(() => x.b.classList.remove('no'), 520);
         const w = api.wrong({ chosen: x.p.t });
-        if (w >= 2) hint(); else api.speak('Tente outra!');
+        if (w >= 2) hint(); else api.speak('Tente de novo!');
       }
     };
   });
@@ -1931,7 +1980,7 @@ L.register({
   render(it, host, api) {
     UI.ask(api, host, { text: 'Junte as sílabas!', say: `Junte as sílabas para formar ${it.say}.` });
     UI.pic(host, it.e, wordLabelOf(it));
-    assemble(api, host, it, { need: it.s, say: ss, whole: it.say });
+    assemble(api, host, it, { need: it.s, say: ss, whole: it.say, unit: 'a sílaba' });
   }
 });
 
@@ -1958,7 +2007,7 @@ L.register({
   render(it, host, api) {
     UI.ask(api, host, { text: 'Escreva a palavra!', say: `Escreva a palavra ${it.say}. Toque nas letras na ordem.` });
     UI.pic(host, it.e, wordLabelOf(it));
-    assemble(api, host, it, { need: chars(it.w), say: lt, whole: it.say });
+    assemble(api, host, it, { need: chars(it.w), say: lt, whole: it.say, unit: 'a letra' });
   }
 });
 
@@ -2001,7 +2050,7 @@ L.register({
     UI.choices(api, host, {
       opts: it.opts, label: o => T(o), cls: 'let', isRight: o => o === it.c,
       onRight: () => { const s = slots[it.i]; s.textContent = T(it.c); s.classList.remove('next'); s.classList.add('filled'); api.speak(`${it.say}!`); },
-      onWrong: o => api.speak(`Essa é a letra ${lt(o)}. Tente outra!`)
+      onWrong: o => api.speak(`Essa é a letra ${lt(o)}. Tente de novo!`)
     });
   }
 });
@@ -2062,7 +2111,7 @@ L.register({
     if (it.kind === 'montar') {
       UI.ask(api, host, { text: 'Escreva o seu nome!', say: `Vamos escrever o seu nome, ${nm}! Toque nas letras na ordem.` });
       UI.pic(host, '👧', nm);
-      assemble(api, host, it, { need: chars(it.name), say: lt, whole: nm });
+      assemble(api, host, it, { need: chars(it.name), say: lt, whole: nm, unit: 'a letra' });
     } else {
       UI.ask(api, host, { text: 'Trace o seu nome!', say: `Agora trace o seu nome, ${nm}.` });
       UI.trace(api, host, { text: T(it.name), onSuccess: () => api.speak(nm + '!') });
@@ -2112,7 +2161,7 @@ L.register({
     emoChoices(api, host, it, {
       isRight: o => o === r,
       onRight: () => api.speak(`${t.say} rima com ${r.say}!`),
-      onWrong: o => api.speak(`${o.say} não rima com ${t.say}. Tente outra!`)
+      onWrong: o => api.speak(`${o.say} não rima com ${t.say}. Tente de novo!`)
     });
   }
 });
@@ -2147,7 +2196,7 @@ L.register({
     emoChoices(api, host, it, {
       isRight: o => o === it.r,
       onRight: () => api.speak(`${it.r.say} começa com ${sy}!`),
-      onWrong: o => api.speak(`${o.say} começa com ${ss(o.s[0])}. Tente outra!`)
+      onWrong: o => api.speak(`${o.say} começa com ${ss(o.s[0])}. Tente de novo!`)
     });
   }
 });
@@ -2185,7 +2234,7 @@ L.register({
           host.append(row);
           api.speak(`${it.s.map(ss).join(', ')}. ${it.say} tem ${D.NUMW[it.n]} ${it.n === 1 ? 'pedacinho' : 'pedacinhos'}!`);
         },
-        onWrong: o => api.speak(`Não são ${D.NUMW[o]}. Bata de novo, devagar, e conte.`)
+        onWrong: o => api.speak(o === 1 ? 'Não é um só pedacinho. Bata de novo, devagar, e conte.' : `Não são ${D.NUMW[o]}. Bata de novo, devagar, e conte.`)
       });
       if (it.max === 4) box.classList.add('n4');
       api.speak('Quantos pedacinhos?');
@@ -2724,7 +2773,7 @@ L.register({
           UI.choices(api, host, {
             opts: it.opts, label: x => String(x), cls: 'num', isRight: x => x === r,
             onRight: () => { eq.fill(r); api.speak(`${nw(m)} menos ${nw(b)} é igual a ${nw(r)}!`); },
-            onWrong: () => { ctr.reset(); api.speak(r === 0 ? 'Olhe bem! Sobrou alguma?' : 'Conte os que sobraram!'); }
+            onWrong: () => { ctr.reset(); api.speak(r === 0 ? `Olhe bem! Sobrou ${o.fem ? 'alguma' : 'algum'}?` : `Conte ${o.fem ? 'as' : 'os'} que sobraram!`); }
           });
         }, 900);
       }
