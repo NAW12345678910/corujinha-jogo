@@ -205,6 +205,12 @@ h1,h2,h3,p{margin:0}
 
 .nameinp{font:inherit;font-family:var(--kid);font-size:max(6vmin,24px);text-align:center;padding:1.4vmin 3vmin;border-radius:3vmin;border:.6vmin solid #7c5cff;width:min(80vw,420px);user-select:text;-webkit-user-select:text;color:var(--ink)}
 
+/* traçado por traços: bolinha de início, dedinho-guia */
+.sdot{position:absolute;transform:translate(-50%,-50%);border-radius:50%;background:#16a06a;color:#fff;font-weight:800;place-items:center;pointer-events:none;font-family:var(--ui);animation:dotpulse 1s infinite}
+.sdot.flash{background:#ff9a2e;animation:shake .35s 2}
+.ghost{position:absolute;left:0;top:0;font-size:max(7vmin,30px);opacity:0;pointer-events:none;margin:-.15em 0 0 -.3em;transition:opacity .25s;filter:drop-shadow(0 .6vmin .6vmin rgba(0,0,0,.25))}
+@keyframes dotpulse{0%,100%{box-shadow:0 0 0 0 rgba(22,160,106,.55)}50%{box-shadow:0 0 0 14px rgba(22,160,106,0)}}
+
 </style>
 <style>
 /* estilos específicos dos jogos de letras/leitura (dono: construtor de leitura) */
@@ -739,7 +745,153 @@ UI.choices = function (api, host, o) {
    o = { text, onSuccess() }   Ao completar chama onSuccess e api.correct().
    Multitoque seguro, refaz ao girar a tela, aceita "Pronto" mais tolerante. */
 const FONT = '700 {S}px "Andika","Comic Sans MS","Segoe Print","Trebuchet MS",Verdana,sans-serif';
+/* ---- Traçado por TRAÇOS: confere ordem, direção e ponto de partida (letras MAIÚSCULAS e números) ---- */
+let svgNS = null;
+function samplePath(d, sc, ox, oy) {
+  if (!svgNS) { svgNS = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svgNS.setAttribute('width', '0'); svgNS.setAttribute('height', '0'); svgNS.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'; document.body.append(svgNS); }
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); svgNS.append(p);
+  const len = p.getTotalLength(), step = 4 / sc, pts = [];
+  for (let l = 0; l < len; l += step) { const q = p.getPointAtLength(l); pts.push([ox + q.x * sc, oy + q.y * sc]); }
+  const e = p.getPointAtLength(len); pts.push([ox + e.x * sc, oy + e.y * sc]); p.remove();
+  return pts;
+}
+function traceStrokes(api, host, o, chars) {
+  const wrap = h('div', { class: 'cwrap' }), g = h('canvas'), p = h('canvas'), c = h('canvas');
+  const dot = h('div', { class: 'sdot' }), ghost = h('div', { class: 'ghost', 'aria-hidden': 'true' }, '👆');
+  wrap.append(g, p, c, dot, ghost);
+  const mbar = h('div', { class: 'mbar' }), msg = h('div', { class: 'tip', 'aria-live': 'polite' }, '');
+  const api2 = { clear() {}, replay() {} };
+  wrap.__api = api2;
+  host.append(wrap, h('div', { class: 'meter' }, mbar), msg,
+    h('div', { class: 'row' },
+      UI.btn('🧽', 'c-blue round', () => api2.clear(), 'Apagar tudo'),
+      UI.btn('▶', 'c-green round', () => api2.replay(), 'Ver como faz'),
+      UI.btn('⏭', 'c-orange round small', () => api.skip(), 'Pular')));
+  let st = null, drawing = false, pid = null, mode = 'off', last = null, hue = Math.random() * 360, lastAct = performance.now(), warned = 0;
+  const tip = t => { msg.textContent = t; };
+
+  function setup() {
+    const W = wrap.clientWidth, H = wrap.clientHeight; if (W < 20 || H < 20) return;
+    const k = Math.min(2, window.devicePixelRatio || 1);
+    for (const cv of [g, p, c]) { cv.width = Math.round(W * k); cv.height = Math.round(H * k); }
+    const gx = g.getContext('2d'), px = p.getContext('2d'), cx = c.getContext('2d');
+    for (const x of [gx, px, cx]) { x.setTransform(k, 0, 0, k, 0, 0); x.lineCap = 'round'; x.lineJoin = 'round'; }
+    const n = chars.length, sc = (n === 1 ? Math.min(H * .86, W * .86) : Math.min(H * .8, W * .94 / n)) / 100;
+    const oy = (H - 100 * sc) / 2, strokes = []; let total = 0;
+    chars.forEach((ch, i) => {
+      const ox = (W - n * 100 * sc) / 2 + i * 100 * sc;
+      L.data.STROKES[ch].forEach((d, si) => { const pts = samplePath(d, sc, ox, oy); strokes.push({ pts, num: si + 1 }); total += pts.length; });
+    });
+    const bw = Math.max(16, Math.min(42, sc * 13));
+    st = { W, H, k, gx, px, cx, strokes, cur: 0, pi: 0, bw, tol: bw * .95, startR: Math.max(32, bw * 1.5), total, doneBase: 0, mbarN: 0 };
+    px.lineWidth = bw * .9;
+    paintGuide(); placeDot(); mbar.style.width = '0'; lastAct = performance.now();
+    tip(strokes.length > 1 ? `Traço 1 de ${strokes.length}: comece na bolinha verde 🟢` : 'Comece na bolinha verde 🟢');
+  }
+  function paintGuide() {
+    const { gx, W, H, bw, strokes } = st; gx.clearRect(0, 0, W, H);
+    for (const s of strokes) { gx.beginPath(); s.pts.forEach((q, i) => i ? gx.lineTo(q[0], q[1]) : gx.moveTo(q[0], q[1])); gx.lineWidth = bw; gx.strokeStyle = '#ece8fb'; gx.setLineDash([]); gx.stroke(); }
+    for (const s of strokes) { gx.beginPath(); s.pts.forEach((q, i) => i ? gx.lineTo(q[0], q[1]) : gx.moveTo(q[0], q[1])); gx.lineWidth = 4; gx.strokeStyle = '#8f7fd6'; gx.setLineDash([1, 14]); gx.stroke(); }
+    gx.setLineDash([]);
+    strokes.forEach((s, i) => {                                   // número de cada traço
+      if (i < st.cur) return;
+      const q = s.pts[0]; gx.fillStyle = i === st.cur ? '#16a06a' : '#8f7fd6'; gx.beginPath(); gx.arc(q[0], q[1], bw * .34, 0, 7); gx.fill();
+      gx.fillStyle = '#fff'; gx.font = `800 ${Math.round(bw * .42)}px sans-serif`; gx.textAlign = 'center'; gx.textBaseline = 'middle'; gx.fillText(String(s.num), q[0], q[1] + 1);
+    });
+    const s = strokes[st.cur];                                    // setinhas do traço atual
+    if (s) {
+      gx.strokeStyle = '#7c5cff'; gx.lineWidth = 5; let acc = 0;
+      for (let i = 1; i < s.pts.length - 1; i++) {
+        acc += Math.hypot(s.pts[i][0] - s.pts[i - 1][0], s.pts[i][1] - s.pts[i - 1][1]);
+        if (acc < 70 || i < 12 || i > s.pts.length - 12) continue; acc = 0;
+        const a = s.pts[i - 3], b = s.pts[i + 3], ang = Math.atan2(b[1] - a[1], b[0] - a[0]), q = s.pts[i], r = bw * .28;
+        gx.beginPath(); gx.moveTo(q[0] - Math.cos(ang - .6) * r, q[1] - Math.sin(ang - .6) * r); gx.lineTo(q[0], q[1]); gx.lineTo(q[0] - Math.cos(ang + .6) * r, q[1] - Math.sin(ang + .6) * r); gx.stroke();
+      }
+    }
+  }
+  function placeDot() {
+    const s = st.strokes[st.cur];
+    if (!s) { dot.style.display = 'none'; return; }
+    const q = s.pts[st.pi > 0 ? st.pi : 0], d = st.bw * 1.4;
+    dot.style.cssText = `display:grid;width:${d}px;height:${d}px;left:${q[0]}px;top:${q[1]}px;font-size:${d * .5}px`;
+    dot.textContent = st.pi > 0 ? '' : String(s.num);
+  }
+  function flash() { dot.classList.remove('flash'); void dot.offsetWidth; dot.classList.add('flash'); }
+  function near(q, a, r) { return Math.hypot(q.x - a[0], q.y - a[1]) <= r; }
+  function paintTo(from, to) {
+    const s = st.strokes[st.cur], px = st.px; px.beginPath(); px.moveTo(s.pts[from][0], s.pts[from][1]);
+    for (let i = from + 1; i <= to; i++) px.lineTo(s.pts[i][0], s.pts[i][1]);
+    hue = (hue + 9) % 360; px.strokeStyle = `hsl(${hue},85%,58%)`; px.stroke();
+    st.mbarN += to - from; mbar.style.width = Math.min(100, Math.round((st.doneBase + st.mbarN) / st.total * 100)) + '%';
+  }
+  function strokeDone() {
+    const s = st.strokes[st.cur]; st.px.beginPath(); s.pts.forEach((q, i) => i ? st.px.lineTo(q[0], q[1]) : st.px.moveTo(q[0], q[1])); st.px.strokeStyle = `hsl(${hue},85%,58%)`; st.px.stroke();
+    st.cur++; st.pi = 0; st.doneBase = (st.doneBase || 0) + st.mbarN; st.mbarN = 0; api.sfx.pop(); lastAct = performance.now();
+    mode = 'off';                                                // levante o dedo e comece o próximo traço
+    if (st.cur >= st.strokes.length) { mbar.style.width = '100%'; dot.style.display = 'none'; ghost.style.opacity = 0; tip('Muito bem! ✅'); if (o.onSuccess) o.onSuccess(); api.correct(); return; }
+    paintGuide(); placeDot(); tip(`Traço ${st.cur + 1} de ${st.strokes.length}: comece na bolinha verde 🟢`);
+  }
+  const P = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * (st.W / r.width), y: (e.clientY - r.top) * (st.H / r.height) }; };
+  const trail = (a, b, ok) => { const cx = st.cx; cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.lineWidth = 9; cx.strokeStyle = ok ? 'rgba(124,92,255,.35)' : 'rgba(150,150,150,.45)'; cx.stroke(); };
+
+  api2.clear = () => { if (!st) return; st.px.clearRect(0, 0, st.W, st.H); st.cx.clearRect(0, 0, st.W, st.H); st.cur = 0; st.pi = 0; st.mbarN = 0; st.doneBase = 0; paintGuide(); placeDot(); mbar.style.width = '0'; lastAct = performance.now(); tip('Comece na bolinha verde 🟢'); };
+  api2.debug = () => st;
+  api2.replay = () => { lastAct = performance.now() - 1200; flash(); api.speak('Olhe o dedinho e siga o caminho!'); };
+
+  c.addEventListener('pointerdown', e => {
+    if (busyLocal() || !st || drawing || e.button > 0) return;
+    drawing = true; pid = e.pointerId; try { c.setPointerCapture(pid); } catch (_) {}
+    last = P(e); lastAct = performance.now(); e.preventDefault();
+    const s = st.strokes[st.cur];
+    if (near(last, s.pts[st.pi], st.startR)) { mode = 'ok'; warned = 0; }
+    else {
+      mode = 'bad'; flash();
+      const first = near(last, s.pts[0], st.startR * 1.2);
+      tip(st.pi > 0 && !first ? 'Continue de onde parou 👆' : 'Comece na bolinha verde 🟢');
+      if (++warned <= 2) api.speak('Comece na bolinha verde');
+    }
+  });
+  c.addEventListener('pointermove', e => {
+    if (!drawing || e.pointerId !== pid || !st) return;
+    const q = P(e); trail(last, q, mode === 'ok'); last = q;
+    if (mode !== 'ok' || st.cur >= st.strokes.length) return;
+    const s = st.strokes[st.cur], n = s.pts.length, win = 40; let best = -1, bd = 1e9;
+    for (let j = st.pi; j < Math.min(n, st.pi + win); j++) { const d = Math.hypot(q.x - s.pts[j][0], q.y - s.pts[j][1]); if (d < bd) { bd = d; best = j; } }
+    if (best > st.pi && bd <= st.tol) { const from = st.pi; st.pi = best; paintTo(from, best); placeDot(); if (st.pi >= n - 1 - Math.max(6, Math.round(n * .1))) strokeDone(); }
+    else if (bd > st.tol * 2.2) tip('Fique em cima do tracinho 👆');
+  });
+  const up = e => {
+    if (!drawing || e.pointerId !== pid) return; drawing = false; pid = null; lastAct = performance.now();
+    if (st) st.cx.clearRect(0, 0, st.W, st.H);
+    if (mode === 'ok' && st && st.cur < st.strokes.length && st.pi > 0) tip('Continue de onde parou 👆');
+    mode = 'off';
+  };
+  c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+  c.addEventListener('lostpointercapture', () => { drawing = false; pid = null; });
+  function busyLocal() { return api.locked(); }
+
+  // dedinho que mostra o caminho (some quando ela começa a desenhar, volta depois de uma pausa)
+  (function loop(t) {
+    if (!wrap.isConnected) return;
+    if (st && !drawing && !api.locked() && st.cur < st.strokes.length && performance.now() - lastAct > 1500) {
+      const s = st.strokes[st.cur], cyc = (performance.now() - lastAct - 1500) % 2800, T = 1800;
+      if (cyc < T) { const a = st.pi, idx = Math.min(s.pts.length - 1, a + Math.floor(cyc / T * (s.pts.length - 1 - a))), q = s.pts[idx]; ghost.style.opacity = 1; ghost.style.transform = `translate(${q[0]}px,${q[1]}px)`; }
+      else ghost.style.opacity = 0;
+    } else ghost.style.opacity = 0;
+    requestAnimationFrame(loop);
+  })();
+  api.later(setup, 30);
+  if ('ResizeObserver' in window) {
+    let first = true, t = null;
+    const ro = new ResizeObserver(() => { if (first) { first = false; return; } clearTimeout(t); t = setTimeout(() => { if (wrap.isConnected) setup(); else ro.disconnect(); }, 150); });
+    ro.observe(wrap);
+  }
+  return api2;
+}
+
 UI.trace = function (api, host, o) {
+  const plan = L.data.STROKES && [...o.text].every(ch => L.data.STROKES[ch]) ? [...o.text] : null;
+  if (plan) return traceStrokes(api, host, o, plan);
   const text = o.text, isWord = text.length > 1;
   const wrap = h('div', { class: 'cwrap' }), g = h('canvas'), c = h('canvas');
   wrap.append(g, c);
@@ -1421,6 +1573,53 @@ D.NUMW = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco'];
 
 </script>
 <script>
+/* Traços das letras MAIÚSCULAS (letra de forma/bastão) e dos números, na ordem e direção em que se escrevem.
+   Cada letra é uma lista de traços; cada traço é um caminho SVG numa caixa 100×100 (letra ocupa ~x 18–82, y 8–92).
+   O tracejado confere: começar na bolinha, seguir o caminho no sentido certo, e fazer os traços na ordem. */
+(function () {
+const L = window.Cora;
+const S = L.data.STROKES = {
+  A: ['M22 92 L50 8', 'M50 8 L78 92', 'M33 64 L67 64'],
+  B: ['M26 8 L26 92', 'M26 8 L52 8 C76 8 76 48 52 48 L26 48', 'M26 48 L56 48 C82 48 82 92 54 92 L26 92'],
+  C: ['M76 26 C66 10 24 8 24 50 C24 92 66 90 76 74'],
+  D: ['M24 8 L24 92', 'M24 8 L44 8 C86 8 86 92 44 92 L24 92'],
+  E: ['M30 8 L30 92', 'M30 8 L76 8', 'M30 50 L70 50', 'M30 92 L76 92'],
+  F: ['M30 8 L30 92', 'M30 8 L76 8', 'M30 50 L68 50'],
+  G: ['M76 26 C66 10 24 8 24 50 C24 92 74 96 78 60', 'M52 56 L78 56'],
+  H: ['M26 8 L26 92', 'M74 8 L74 92', 'M26 50 L74 50'],
+  I: ['M50 8 L50 92'],
+  J: ['M62 8 L62 68 C62 94 28 96 24 68'],
+  K: ['M28 8 L28 92', 'M74 8 L28 56', 'M42 44 L76 92'],
+  L: ['M30 8 L30 92 L76 92'],
+  M: ['M20 8 L20 92', 'M20 8 L50 62 L80 8', 'M80 8 L80 92'],
+  N: ['M24 8 L24 92', 'M24 8 L76 92', 'M76 92 L76 8'],
+  O: ['M50 8 C16 8 16 92 50 92 C84 92 84 8 50 8'],
+  P: ['M26 8 L26 92', 'M26 8 L50 8 C80 8 80 52 50 52 L26 52'],
+  Q: ['M50 8 C16 8 16 92 50 92 C84 92 84 8 50 8', 'M54 66 L80 94'],
+  R: ['M26 8 L26 92', 'M26 8 L50 8 C80 8 80 50 50 50 L26 50', 'M48 50 L76 92'],
+  S: ['M74 24 C68 8 24 6 26 32 C28 56 74 44 74 70 C74 98 28 96 24 76'],
+  T: ['M20 8 L80 8', 'M50 8 L50 92'],
+  U: ['M24 8 L24 62 C24 100 76 100 76 62 L76 8'],
+  V: ['M20 8 L50 92 L80 8'],
+  W: ['M10 8 L30 92 L50 30 L70 92 L90 8'],
+  X: ['M22 8 L78 92', 'M78 8 L22 92'],
+  Y: ['M20 8 L50 50', 'M80 8 L50 50', 'M50 50 L50 92'],
+  Z: ['M24 8 L76 8 L24 92 L76 92'],
+  '0': ['M50 8 C20 8 20 92 50 92 C80 92 80 8 50 8'],
+  '1': ['M34 28 L54 8 L54 92'],
+  '2': ['M26 30 C26 -2 76 -2 74 32 C72 54 40 70 24 92 L78 92'],
+  '3': ['M26 20 C34 2 70 2 72 28 C74 48 52 50 42 50 C56 50 78 54 76 74 C72 100 30 98 24 80'],
+  '4': ['M60 8 L20 64 L80 64', 'M60 8 L60 92'],
+  '5': ['M72 8 L32 8 L28 46 C62 36 82 58 76 76 C70 98 32 98 22 82'],
+  '6': ['M68 10 C36 20 22 46 24 68 C26 100 78 100 76 68 C74 38 30 38 24 62'],
+  '7': ['M22 8 L78 8 L40 92'],
+  '8': ['M50 48 C20 48 22 8 50 8 C78 8 80 48 50 48 C16 48 18 92 50 92 C82 92 84 48 50 48'],
+  '9': ['M72 38 C72 6 26 6 26 32 C26 60 72 62 72 38 C72 70 62 92 36 92']
+};
+})();
+
+</script>
+<script>
 /* JOGOS DE LETRAS / LEITURA / CONSCIÊNCIA FONOLÓGICA — dono: construtor de leitura.
    Dados em js/data/palavras.js (Cora.data). Regras de ouro em API.md. */
 (function () {
@@ -1476,15 +1675,16 @@ function letterOpts(target, pool, k, lv, mode) {
 }
 L.register({
   id: 'letras', title: 'Achar a letra', icon: '🔤', color: 'pink', area: 'letras',
-  levels: ['Vogais', 'Letras fáceis', 'Todas as letras'], n: 6,
+  levels: ['Todas as letras'], n: 6,
   items(level, n) {
-    const pool = LPOOL[level], pairs = [];
+    const pool = ALPHA, pairs = [];
     for (const c of chars(pool)) { pairs.push({ c, mode: 'ouvir' }); if (!LET[c].listenOnly) pairs.push({ c, mode: 'inicio' }); }
     const picked = L.srs.pick(pairs, Math.min(n, pairs.length), p => 'letras:' + p.mode + ':' + p.c);
     const list = interleave(picked.filter(p => p.mode === 'ouvir'), picked.filter(p => p.mode === 'inicio'));
     return list.map(p => {
       const anch = LET[p.c].anch.filter(a => !a.fl.includes('x') || p.mode === 'ouvir');
-      return { key: 'letras:' + p.mode + ':' + p.c, L: p.c, mode: p.mode, a: rnd(anch), opts: letterOpts(p.c, pool, level === 2 ? 4 : 3, level, p.mode) };
+      const key = 'letras:' + p.mode + ':' + p.c, sk = L.srs.get(key);          // 4 opções quando ela já vai bem nessa letra
+      return { key, L: p.c, mode: p.mode, a: rnd(anch), opts: letterOpts(p.c, pool, sk && sk.box >= 2 ? 4 : 3, 2, p.mode) };
     });
   },
   render(it, host, api) {
@@ -1515,29 +1715,51 @@ L.register({
    ============================================================ */
 const C10 = 'MPBTLVFDNS', C16 = 'MPBTLVFDNSCGRJZX';
 const vowelsOf = c => 'CG'.includes(c) ? 'AOU' : VOW;       // C e G só com A/O/U
-const SYL_POOL = [
-  chars(C10).map(c => c + 'A'),
-  chars(C10).flatMap(c => chars(VOW).map(v => c + v)),
-  chars(C16).flatMap(c => chars(vowelsOf(c)).map(v => c + v))
+const onsetOf = s => s.match(/^[^AEIOUÃÕ]*/)[0], restOf = s => s.slice(onsetOf(s).length);
+const CV = cs => chars(cs).flatMap(c => chars(VOW).map(v => c + v));
+const SYL_LEVELS = [
+  { name: 'Sílabas com A', pool: chars(C10).map(c => c + 'A') },
+  { name: 'A família da sílaba (BA BE BI BO BU)', pool: CV(C10) },
+  { name: 'Todas as consoantes', pool: chars(C16).flatMap(c => chars(vowelsOf(c)).map(v => c + v)) },
+  { name: 'CE CI · GE GI · QUE QUI · GUE GUI', targets: ['CE', 'CI', 'GE', 'GI', 'QUE', 'QUI', 'GUE', 'GUI'],
+    pool: ['CE', 'CI', 'GE', 'GI', 'QUE', 'QUI', 'GUE', 'GUI', 'CA', 'CO', 'CU', 'GA', 'GO', 'GU', 'SE', 'SI', 'JE', 'JI'] },
+  { name: 'CH · LH · NH', pool: ['CH', 'LH', 'NH'].flatMap(c => chars(VOW).map(v => c + v)) },
+  { name: 'Encontros (BR, TR, PL, GR…)', pool: ['BR', 'CR', 'DR', 'FR', 'GR', 'PR', 'TR', 'BL', 'CL', 'FL', 'GL', 'PL'].flatMap(c => chars(VOW).map(v => c + v)) },
+  { name: 'AR · AL · AS · AN · ÃO', pool: ['AR', 'ER', 'IR', 'OR', 'UR', 'AL', 'EL', 'IL', 'OL', 'UL', 'AS', 'ES', 'IS', 'OS', 'US', 'AN', 'EN', 'IN', 'ON', 'UN', 'AM', 'EM', 'IM', 'OM', 'UM', 'ÃO', 'ÃE', 'ÕE'] }
 ];
-function sylOpts(level, c, v) {
+// sílabas que SOAM IGUAL nunca aparecem juntas (CE/SE, GE/JE, XA/CHA, AM/AN…)
+const HOMO = [['CE', 'SE'], ['CI', 'SI'], ['GE', 'JE'], ['GI', 'JI'], ['AM', 'AN'], ['EM', 'EN'], ['IM', 'IN'], ['OM', 'ON'], ['UM', 'UN'],
+  ['XA', 'CHA'], ['XE', 'CHE'], ['XI', 'CHI'], ['XO', 'CHO'], ['XU', 'CHU']];
+const homo = (a, b) => a === b || HOMO.some(g => g.includes(a) && g.includes(b));
+function sylOpts(level, c, v) {                               // degraus 1-3: vogais/consoantes bem diferentes
   const target = c + v;
-  if (level === 0) {                                          // consoantes bem diferentes entre si, sempre com A
+  if (level === 0) {
     const out = [c];
     for (const x of shuffle(chars(C10))) { if (out.length >= 3) break; if (!out.some(o => D.sconf(o, x))) out.push(x); }
     return shuffle(out.map(x => x + 'A'));
   }
-  if (level === 1) return shuffle([target, ...sample(chars(VOW).filter(x => x !== v), 2).map(x => c + x)]);   // família BA BE BI BO BU
+  if (level === 1) return shuffle([target, ...sample(chars(VOW).filter(x => x !== v), 2).map(x => c + x)]);
   const same = sample(chars(vowelsOf(c)).filter(x => x !== v), 2).map(x => c + x);
   const c2 = shuffle(chars(C16)).find(x => !D.sconf(c, x) && vowelsOf(x).includes(v));
   return shuffle([target, ...same, c2 + v]);
 }
+function sylOptsSimilar(target, pool, k) {                    // degraus 4-7: as mais parecidas (BRA/BRE/TRA…)
+  const sim = o => (onsetOf(o) === onsetOf(target) ? 3 : 0) + (restOf(o) === restOf(target) ? 3 : 0) + (o[0] === target[0] ? 1 : 0) + Math.random() * 1.5;
+  const out = [target];
+  for (const { o } of pool.filter(o => !homo(o, target)).map(o => ({ o, s: sim(o) })).sort((a, b) => b.s - a.s)) {
+    if (out.length >= k) break; if (!out.some(x => homo(x, o))) out.push(o);
+  }
+  return shuffle(out);
+}
 L.register({
   id: 'silabas', title: 'Sílabas', icon: '👂', color: 'violet', area: 'letras',
-  levels: ['Sílabas com A', 'A família da sílaba', 'Sílabas misturadas'], n: 6,
+  levels: SYL_LEVELS.map(x => x.name), n: 6,
   items(level, n) {
-    const picked = L.srs.pick(SYL_POOL[level], Math.min(n, SYL_POOL[level].length), s => 'silabas:' + s);
-    return picked.map(s => ({ key: 'silabas:' + s, syl: s, ex: exWord(s), opts: sylOpts(level, s[0], s[1]) }));
+    const lv = SYL_LEVELS[level], targets = lv.targets || lv.pool;
+    return L.srs.pick(targets, Math.min(n, targets.length), s => 'silabas:' + s).map(s => ({
+      key: 'silabas:' + s, syl: s, ex: exWord(s),
+      opts: level <= 2 ? sylOpts(level, s[0], s[1]) : sylOptsSimilar(s, lv.pool, level >= 4 ? 4 : 3)
+    }));
   },
   render(it, host, api) {
     const say = ss(it.syl);
@@ -1559,17 +1781,15 @@ L.register({
    ============================================================ */
 L.register({
   id: 'ler', title: 'Vamos ler', icon: '📖', color: 'blue', area: 'letras',
-  levels: D.LEVEL_NAMES, n: 6,
+  levels: ['Palavras curtas e longas'], n: 6,
   items(level, n) {
-    const pool = wordsFor(level, x => x.n <= 4);
-    let items;
-    if (level === 2) {                                         // nível 3: 1/3 palavras do mundo da lua
-      const np = Math.max(1, Math.round(n / 3));
-      const ps = sample(D.PSEUDO, np).map(p => ({ key: 'ler:~' + p.w, w: p.w, s: p.s, e: '👽', say: low(p.w), pseudo: true }));
-      const ws = fill(pool, n - np, x => 'ler:' + x.w).map(x => ({ key: 'ler:' + x.w, w: x.w, s: x.s, e: x.e, say: x.say }));
-      items = shuffle([...ps, ...ws]);
-    } else items = fill(pool, n, x => 'ler:' + x.w).map(x => ({ key: 'ler:' + x.w, w: x.w, s: x.s, e: x.e, say: x.say }));
-    return items;
+    // mistura de tamanhos: curtas (1-2 sílabas), médias (3) e longas (4 ou mais); 1 "palavra do mundo da lua" quando dá
+    const np = n >= 5 ? 1 : 0, rest = n - np, a = Math.ceil(rest / 3), lg = Math.ceil((rest - a) / 2), md = rest - a - lg;
+    const grp = [[x => x.n <= 2, a], [x => x.n >= 4, lg], [x => x.n === 3, md]];
+    const ws = grp.flatMap(([f, k]) => k > 0 ? L.srs.pick(D.READ.filter(f), k, x => 'ler:' + x.w) : [])
+      .map(x => ({ key: 'ler:' + x.w, w: x.w, s: x.s, e: x.e, say: x.say }));
+    const ps = sample(D.PSEUDO, np).map(p => ({ key: 'ler:~' + p.w, w: p.w, s: p.s, e: '👽', say: low(p.w), pseudo: true }));
+    return shuffle([...ws, ...ps]);
   },
   render(it, host, api) {
     const alive = () => api.item() === it && host.isConnected;
@@ -1616,12 +1836,13 @@ function wordDistract(x, level, pool, k) {
 }
 L.register({
   id: 'palavra', title: 'Qual é a palavra?', icon: '🖼️', color: 'green', area: 'letras',
-  levels: D.LEVEL_NAMES, n: 6,
+  levels: ['Todos os tipos de palavras'], n: 6,
   items(level, n) {
-    const pool = wordsFor(level), all = D.READ.filter(x => x.lv <= level + 1), k = level === 0 ? 1 : 2;
-    return L.srs.pick(pool, Math.min(n, pool.length), x => 'palavra:' + x.w).map(x => ({
-      key: 'palavra:' + x.w, w: x.w, e: x.e, opts: shuffle([x.w, ...wordDistract(x, level, all, k).map(o => o.w)])
-    }));
+    // todas as palavras (curtas, longas, simples, difíceis); as opções erradas ficam mais parecidas conforme ela vai acertando
+    return L.srs.pick(D.READ, Math.min(n, D.READ.length), x => 'palavra:' + x.w).map(x => {
+      const sk = L.srs.get('palavra:' + x.w), similar = Math.random() < (sk && sk.box >= 1 ? .75 : .4), k = sk && sk.box >= 2 ? 3 : 2;
+      return { key: 'palavra:' + x.w, w: x.w, e: x.e, opts: shuffle([x.w, ...wordDistract(x, similar ? 1 : 0, D.READ, k).map(o => o.w)]) };
+    });
   },
   render(it, host, api) {
     const hear = UI.ask(api, host, { text: 'Qual é a palavra?', say: 'Qual é a palavra desta figura?' });
