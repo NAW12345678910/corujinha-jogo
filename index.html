@@ -262,6 +262,7 @@ h1,h2,h3,p{margin:0}
 .nm-field.s1{--cs:clamp(72px,17vmin,128px)}
 .nm-field.s2{--cs:clamp(60px,12.5vmin,92px)}
 .nm-field.s3{--cs:clamp(56px,10vmin,76px)}
+.nm-field.s4{--cs:clamp(48px,8.4vmin,64px);gap:1vmin;max-width:min(98vw,880px)}
 .nm-gap{width:var(--cs);height:var(--cs);flex:none}
 .nm-obj{position:relative;flex:none;width:var(--cs);height:var(--cs);padding:0;border-radius:3vmin;background:rgba(255,255,255,.62);
   display:grid;place-items:center;left:var(--jx,0);top:var(--jy,0);transition:background .2s,box-shadow .2s,opacity .25s}
@@ -378,6 +379,7 @@ h1,h2,h3,p{margin:0}
   .nm-field.s1{--cs:clamp(60px,15vmin,90px)}
   .nm-field.s2{--cs:clamp(56px,13vmin,80px)}
   .nm-field.s3{--cs:56px}
+  .nm-field.s4{--cs:48px}
   .nm-eq{font-size:max(7vmin,26px);min-height:44px;padding:.4vmin 3vmin}
   .nm-op{font-size:max(7vmin,26px)}
   .nm-big{height:max(15vmin,60px);min-width:max(15vmin,60px);font-size:max(11vmin,40px)}
@@ -400,6 +402,38 @@ h1,h2,h3,p{margin:0}
   .g-escrevernum .cwrap{height:min(40vh,200px)}
   .g-escrevernum .ask .bubble{display:none}
 }
+
+</style>
+<style>
+/* Alfabeto / Contar até 30 (od-) e Histórias (st-) */
+.od-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(11vmin,54px),1fr));gap:1.6vmin;width:min(96vw,900px)}
+.od-grid.many{grid-template-columns:repeat(auto-fill,minmax(max(9.5vmin,50px),1fr));gap:1.2vmin}
+.od-cell{min-height:max(11vmin,54px);padding:0;font-family:var(--kid);font-size:max(6.4vmin,26px);display:grid;place-items:center;border-radius:2.6vmin}
+.od-grid.many .od-cell{min-height:max(9.5vmin,50px);font-size:max(5.4vmin,22px)}
+.od-grid.num .od-cell{font-family:var(--title)}
+.od-cell.nxt{box-shadow:0 1.1vmin 0 #d4a91c,0 0 0 .7vmin #ffd23f;animation:pulse 1s infinite}
+.od-cell.done{--c:#b8f3cf;--d:#1fbf7a;color:#0d7650}
+.od-cell.no{--c:#ffe3b8;--d:#ffb547;animation:shake .4s}
+.od-cell.hint{animation:hint .7s infinite}
+
+.st-stage{gap:1.8vmin}
+.st-title{font-family:var(--title);font-size:max(4.4vmin,19px);font-weight:700;text-align:center}
+.st-scene{font-size:min(20vmin,24vw);line-height:1.05;text-align:center;filter:drop-shadow(0 1vmin 1vmin rgba(43,27,94,.2))}
+.st-scene.in{animation:rise .5s cubic-bezier(.2,1.4,.4,1)}
+.st-text{background:#fff;border-radius:3.5vmin;padding:2.4vmin 3.4vmin;max-width:min(94vw,900px);font-family:var(--kid);font-size:max(5vmin,21px);line-height:1.55;font-weight:700;box-shadow:0 .8vmin 0 #cfc8ea;text-align:center}
+.st-s{border-radius:1.2vmin;transition:background .25s;padding:.2vmin 0}
+.st-s.on{background:#fff0a8;box-shadow:0 0 0 .6vmin #fff0a8}
+.st-w{cursor:pointer}
+.st-w.tap{color:#e8458f}
+.st-dots{display:flex;gap:1.2vmin}
+.st-chip{background:rgba(255,255,255,.8);border-radius:99px;padding:.8vmin 2.6vmin;font-weight:800;font-size:max(2.8vmin,13px)}
+.st-opt{display:flex;flex-direction:column;align-items:center;gap:.6vmin}
+.st-opt .e{font-size:max(11vmin,44px);line-height:1;font-family:var(--ui)}
+.st-opt .w{font-size:max(3vmin,14px);font-family:var(--kid);line-height:1.15}
+.choice.st-ch{min-width:max(24vmin,104px);min-height:max(24vmin,104px);max-width:min(30vw,260px);padding:1.4vmin 2vmin}
+.st-num{position:absolute;top:-1.6vmin;left:-1.2vmin;background:#7c5cff;color:#fff;border-radius:50%;width:max(6vmin,28px);height:max(6vmin,28px);display:grid;place-items:center;font-weight:800;font-size:max(3.6vmin,16px);font-family:var(--ui)}
+.st-book .ico{letter-spacing:-.6vmin}
+@media (max-height:520px){.st-scene{font-size:min(14vmin,18vw)}.st-text{font-size:max(4vmin,17px);padding:1.4vmin 2.6vmin}}
 
 </style>
 <script>window.LARA_PUBLIC=true</script>
@@ -1169,7 +1203,7 @@ function finish() {
 
 /* ---------- trilha do dia (automática: alterna Letras e Números) ---------- */
 L.daily = function () {
-  const areas = ['letras', 'numeros', 'letras', 'numeros'], used = new Set(), plan = [];
+  const areas = ['letras', 'numeros', 'letras', 'numeros', 'historias'], used = new Set(), plan = [];
   for (const a of areas) {
     const cand = L.order.map(i => L.games[i]).filter(g => g.area === a && g.daily !== false && !used.has(g.id));
     if (!cand.length) continue;
@@ -1222,7 +1256,7 @@ SC.splash = function () {
 SC.menu = function (first) {
   L.engine.leave();
   const un = L.stickersUnlocked(), per = L.data.STARS_PER_STICKER, left = per - ST.s.stars % per;
-  const card = g => h('button', { class: 'b3 card c-' + g.color, onclick: () => L.play(g.id), 'aria-label': g.title },
+  const card = g => h('button', { class: 'b3 card c-' + g.color, onclick: () => (g.open ? g.open() : L.play(g.id)), 'aria-label': g.title },
     h('span', { class: 'ico' }, g.icon), h('span', { class: 'lbl' }, g.title),
     h('span', { class: 'lvl', 'aria-hidden': 'true' }, '⭐'.repeat(L.level(g.id) + 1)));
   const section = (title, emoji, area) => {
@@ -1238,7 +1272,7 @@ SC.menu = function (first) {
       h('div', { class: 'stars-badge' }, '⭐ ' + ST.s.stars), gear),
     h('button', { class: 'b3 playbig c-pink', onclick: () => { L.sfx.pop(); L.daily(); }, 'aria-label': 'Jogar' },
       h('span', { class: 'ico' }, '▶'), h('span', { class: 'lbl' }, 'JOGAR')),
-    section('Letras', '🔤', 'letras'), section('Números', '🔢', 'numeros'),
+    section('Letras', '🔤', 'letras'), section('Números', '🔢', 'numeros'), section('Histórias', '📚', 'historias'),
     h('section', { class: 'sec' }, h('div', { class: 'grid' }, album))));
   if (first) L.tts.say(`Toque no botão grande para jogar, ou escolha uma brincadeira!`, { queue: true });
 };
@@ -2260,8 +2294,11 @@ const L = window.Cora, U = L.util, UI = L.ui, h = U.h;
 /* ---------- números por extenso (nunca mande dígitos soltos para o TTS) ---------- */
 const NUMS = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez',
   'onze', 'doze', 'treze', 'catorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove', 'vinte'];
+for (let i = 1; i <= 9; i++) NUMS.push('vinte e ' + NUMS[i]);
+NUMS.push('trinta');                                                     // até 30
+L.data.NUMS = NUMS;
 const nw = n => NUMS[n];
-const nwF = n => n === 1 ? 'uma' : n === 2 ? 'duas' : NUMS[n];          // feminino
+const nwF = n => n === 1 ? 'uma' : n === 2 ? 'duas' : n === 21 ? 'vinte e uma' : n === 22 ? 'vinte e duas' : NUMS[n];   // feminino
 const nwG = (n, o) => o.fem ? nwF(n) : NUMS[n];                          // concorda com o objeto
 
 /* ---------- objetos (emoji inequívocos, um tipo por vez) ---------- */
@@ -2327,7 +2364,7 @@ function ask(api, host, text, say) {
 }
 // campo de objetos tocáveis (espalhados em grade com leve tremida, sem sobrepor)
 function mkField(n, o, extra) {
-  const sz = n <= 5 ? 's1' : n <= 10 ? 's2' : 's3';
+  const sz = n <= 5 ? 's1' : n <= 10 ? 's2' : n <= 20 ? 's3' : 's4';
   const field = h('div', { class: 'nm-field ' + sz + (extra ? ' ' + extra : '') });
   const gaps = n <= 10 ? U.rnd([0, 0, 1, 1, 2]) : 0, els = [];
   U.shuffle([...Array(n).fill('o'), ...Array(gaps).fill('g')]).forEach(s => {
@@ -2413,9 +2450,9 @@ function shapeSVG(kind, col, s, r) {
    ============================================================ */
 L.register({
   id: 'contar', title: 'Contar', icon: '🔢', color: 'blue', area: 'numeros',
-  levels: ['1 a 5', '1 a 10', '11 a 20'], n: 6,
+  levels: ['1 a 5', '1 a 10', '11 a 20', '21 a 30'], n: 6,
   items(level, n) {
-    const [lo, hi] = [[1, 5], [1, 10], [11, 20]][level], pool = U.range(lo, hi);
+    const [lo, hi] = [[1, 5], [1, 10], [11, 20], [21, 30]][level], pool = U.range(lo, hi);
     return L.srs.pick(pool, Math.min(n, pool.length), k => 'contar:' + k).map(q => ({
       key: 'contar:' + q, q, obj: U.rnd(OBJS6), opts: mkOpts(q, lo, hi, 2, true)
     }));
@@ -2526,11 +2563,11 @@ L.register({
    ============================================================ */
 L.register({
   id: 'numerais', title: 'Qual é o número?', icon: '🔟', color: 'green', area: 'numeros',
-  levels: ['0 a 5', '0 a 10', '11 a 20'], n: 6,
+  levels: ['0 a 5', '0 a 10', '11 a 20', '21 a 30'], n: 6,
   items(level, n) {
-    const [lo, hi] = [[0, 5], [0, 10], [11, 20]][level], pool = U.range(lo, hi);
+    const [lo, hi] = [[0, 5], [0, 10], [11, 20], [21, 30]][level], pool = U.range(lo, hi);
     return L.srs.pick(pool, Math.min(n, pool.length), k => 'numerais:' + k).map(q => ({
-      key: 'numerais:' + q, q, opts: mkOpts(q, lo, hi, 2, level < 2)           // 6/9 só juntos no nível 3
+      key: 'numerais:' + q, q, opts: mkOpts(q, lo, hi, 2, level !== 2)           // 6/9 só juntos no nível 3
     }));
   },
   render(it, host, api) {
@@ -2551,9 +2588,9 @@ L.register({
    ============================================================ */
 L.register({
   id: 'escrevernum', title: 'Escrever números', icon: '✏️', color: 'pink', area: 'numeros',
-  levels: ['0 a 5', '0 a 9', '10 a 20'], n: 6,
+  levels: ['0 a 5', '0 a 9', '10 a 20', '21 a 30'], n: 6,
   items(level, n) {
-    const [lo, hi] = [[0, 5], [0, 9], [10, 20]][level], pool = U.range(lo, hi);
+    const [lo, hi] = [[0, 5], [0, 9], [10, 20], [21, 30]][level], pool = U.range(lo, hi);
     return L.srs.pick(pool, Math.min(n, pool.length), k => 'escrevernum:' + k).map(q => ({ key: 'escrevernum:' + q, q }));
   },
   render(it, host, api) {
@@ -2566,13 +2603,14 @@ L.register({
 /* ============================================================
    5. ANTES E DEPOIS (vizinhos)
    ============================================================ */
+const VMAX = [10, 20, 30, 20];
 function vizPool(level) {
-  const pool = [], max = level === 0 ? 10 : 20;
-  if (level < 2) {
+  const pool = [], max = VMAX[level];
+  if (level < 3) {
     for (let x = 1; x < max; x++) pool.push({ k: 'depois', x, key: `vizinhos:depois:${x}` });
     for (let x = 2; x <= max; x++) pool.push({ k: 'antes', x, key: `vizinhos:antes:${x}` });
     for (let x = 2; x < max; x++) pool.push({ k: 'falta', x, key: `vizinhos:falta:${x}` });
-    if (level === 1) for (let i = 0; i < 4; i++) pool.push({ k: 'falta2', key: 'vizinhos:falta2' });
+    if (level >= 1) for (let i = 0; i < 4; i++) pool.push({ k: 'falta2', key: 'vizinhos:falta2' });
   } else {
     for (let s = 1; s <= 10; s++) for (let hh = 1; hh <= 4; hh++) pool.push({ k: 'dois', s, hh, key: `vizinhos:2em2:${s + 2 * hh}` });
     for (let i = 0; i < 3; i++) pool.push({ k: 'dois2', key: 'vizinhos:2em2:duplo' });
@@ -2581,7 +2619,7 @@ function vizPool(level) {
   return pool;
 }
 function vizExpand(sp, level) {
-  const max = level === 0 ? 10 : 20; let cells, ans, q, say;
+  const max = VMAX[level]; let cells, ans, q, say;
   if (sp.k === 'depois') {
     const x = sp.x; cells = U.range(Math.max(1, x - 3), x).map(v => ({ v, mark: v === x })); cells.push({ v: x + 1, hole: true });
     ans = [x + 1]; q = `Quem vem depois do ${x}?`; say = `Quem vem depois do ${nw(x)}?`;
@@ -2608,14 +2646,14 @@ function vizExpand(sp, level) {
     q = say = 'Contando de cinco em cinco, qual falta?';
   }
   const vis = cells.filter(c => !c.hole).map(c => c.v);
-  const extra = ans.length === 1 ? 2 : 1, d = [], dmax = level === 2 ? 20 : max;
+  const extra = ans.length === 1 ? 2 : 1, d = [], dmax = level === 3 ? 20 : max;
   ans.forEach(a => { if (d.length < extra) distract(a, 1, dmax, extra - d.length, true, [...vis, ...ans, ...d]).forEach(x => d.length < extra && d.push(x)); });
   while (d.length < extra) { const c = U.rnd(U.range(1, dmax).filter(x => !ans.includes(x) && !d.includes(x))); d.push(c); }
   return { key: sp.key, cells, ans, q, say, opts: U.shuffle([...ans, ...d]) };
 }
 L.register({
   id: 'vizinhos', title: 'Antes e depois', icon: '↔️', color: 'teal', area: 'numeros',
-  levels: ['Até 10', 'Até 20', 'De 2 em 2'], n: 6,
+  levels: ['Até 10', 'Até 20', 'Até 30', 'De 2 em 2'], n: 6,
   items(level, n) {
     const pool = vizPool(level);
     return L.srs.pick(pool, Math.min(n, pool.length), s => s.key).map(sp => vizExpand(sp, level));
@@ -2878,6 +2916,479 @@ L.register({
     if (it.opts.length === 4) bx.classList.add('x4');                       // 2x2 no retrato
   }
 });
+})();
+
+</script>
+<script>
+/* ============================================================
+   ALFABETO e CONTAR ATÉ 30 — tocar na ordem, o que vem depois, o que falta
+   ============================================================ */
+(function () {
+'use strict';
+const L = window.Cora, U = L.util, UI = L.ui, h = U.h, T = U.T, D = L.data;
+const AZ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const lsay = c => D.letterSay(c);
+const nsay = n => D.NUMS[n];
+
+/* toca os itens na ordem. seq = [{v, label, say}]. shuffle = posições embaralhadas (tem que achar o próximo) */
+function run(api, host, seq, o) {
+  const grid = h('div', { class: 'od-grid' + (seq.length > 15 ? ' many' : '') + (o.num ? ' num' : '') });
+  const btns = new Map(); let k = 0, wrongs = 0;
+  (o.shuffle ? U.shuffle(seq) : seq).forEach(it => {
+    const b = h('button', { class: 'b3 od-cell', 'aria-label': it.say }, it.label);
+    b.onclick = () => tap(it, b); btns.set(it, b); grid.append(b);
+  });
+  host.append(grid);
+  const mark = () => { btns.forEach(b => b.classList.remove('nxt', 'hint')); if (!o.shuffle && seq[k]) btns.get(seq[k]).classList.add('nxt'); };
+  mark();
+  function tap(it, b) {
+    if (api.locked() || b.classList.contains('done')) return;
+    if (it === seq[k]) {
+      b.classList.add('done'); api.sfx.tick(k % 8); api.speak(it.say); k++; mark();
+      if (k === seq.length) api.later(() => { if (o.end) api.speak(o.end, { queue: true }); api.correct({ manual: true }); }, 500);
+    } else {
+      b.classList.add('no'); api.later(() => b.classList.remove('no'), 420);
+      api.sfx.no(); UI.mood('oops'); wrongs++;
+      api.speak(`Esse é ${o.num ? 'o' : 'a letra'} ${it.say}. Agora é ${o.num ? 'o' : 'a letra'} ${seq[k].say}.`);
+      if (wrongs >= 2) { api.helped(); btns.get(seq[k]).classList.add('hint'); }   // depois de 2 erros, mostra (sem estrela)
+    }
+  }
+}
+
+/* fita com um buraco: "o que vem depois" / "o que falta" */
+function tape(api, host, it, o) {
+  const t = h('div', { class: 'vz-tape' });
+  const cells = it.cells.map(c => { const d = h('div', { class: 'vz-cell' + (c.hole ? ' vz-hole act' : '') }, c.hole ? '?' : o.label(c.v)); t.append(d); return d; });
+  host.append(t);
+  UI.choices(api, host, {
+    opts: it.opts, label: o.label, cls: o.cls, isRight: x => x === it.ans,
+    onRight: x => {
+      const d = cells[it.cells.findIndex(c => c.hole)]; d.textContent = o.label(x); d.classList.remove('vz-hole', 'act'); d.classList.add('fill');
+      api.speak(it.cells.map(c => o.say(c.v)).join(', ') + '!');
+    },
+    onWrong: x => api.speak(`Esse é ${o.art} ${o.say(x)}. Tente de novo!`)
+  });
+}
+
+/* ---------------- ALFABETO ---------------- */
+function letterDistract(ans, avoid, k) {
+  const out = [];
+  for (const c of U.shuffle(AZ)) {
+    if (out.length >= k) break;
+    if (c === ans || avoid.includes(c) || D.confuse(c, ans, 0) || out.some(x => D.confuse(x, c, 0))) continue;
+    out.push(c);
+  }
+  return out;
+}
+const letterSeq = cs => cs.map(c => ({ v: c, label: T(c), say: lsay(c) }));
+L.register({
+  id: 'alfabeto', title: 'Alfabeto', icon: '🔠', color: 'yellow', area: 'letras',
+  levels: ['Alfabeto em ordem', 'Qual letra vem depois?', 'Ache as letras na ordem', 'Qual letra falta?'], n: 6,
+  items(level, n) {
+    if (level === 0) return [
+      { kind: 'run', key: 'alfabeto:ordem:1', seq: AZ.slice(0, 13) },
+      { kind: 'run', key: 'alfabeto:ordem:2', seq: AZ.slice(13) },
+      { kind: 'run', key: 'alfabeto:ordem:todo', seq: AZ }];
+    if (level === 2) return [
+      { kind: 'run', shuffle: true, key: 'alfabeto:achar:1', seq: AZ.slice(0, 9) },
+      { kind: 'run', shuffle: true, key: 'alfabeto:achar:2', seq: AZ.slice(9, 18) },
+      { kind: 'run', shuffle: true, key: 'alfabeto:achar:3', seq: AZ.slice(18) }];
+    const idx = level === 1 ? U.range(1, 25) : U.range(2, 23);
+    return L.srs.pick(idx, Math.min(n, idx.length), i => `alfabeto:${level === 1 ? 'depois' : 'falta'}:${AZ[i]}`).map(i => {
+      let cells, ans;
+      if (level === 1) { cells = AZ.slice(Math.max(0, i - 3), i).map(v => ({ v })).concat([{ v: AZ[i], hole: true }]); ans = AZ[i]; }
+      else { const lo = U.clamp(i - U.rnd([1, 2, 3]), 0, 21); cells = AZ.slice(lo, lo + 5).map(v => ({ v, hole: v === AZ[i] })); ans = AZ[i]; }
+      const vis = cells.filter(c => !c.hole).map(c => c.v);
+      return { kind: level === 1 ? 'depois' : 'falta', key: `alfabeto:${level === 1 ? 'depois' : 'falta'}:${ans}`, cells, ans,
+               opts: U.shuffle([ans, ...letterDistract(ans, vis, 2)]) };
+    });
+  },
+  render(it, host, api) {
+    if (it.kind === 'run') {
+      const first = lsay(it.seq[0].v || it.seq[0]);
+      UI.ask(api, host, it.shuffle
+        ? { text: 'Ache as letras na ordem!', say: `Ache as letras na ordem do alfabeto. Comece pela letra ${first}.` }
+        : { text: 'Toque nas letras em ordem!', say: `Vamos falar o alfabeto! Toque em cada letra, começando pela letra ${first}.` });
+      run(api, host, letterSeq(it.seq), { end: it.seq.length === 26 ? 'Você falou o alfabeto inteiro!' : '' });
+      return;
+    }
+    UI.ask(api, host, it.kind === 'depois'
+      ? { text: 'Qual letra vem depois?', say: `Qual letra vem depois da letra ${lsay(it.cells[it.cells.length - 2].v)}?` }
+      : { text: 'Qual letra falta?', say: 'Qual letra está faltando no alfabeto?' });
+    tape(api, host, it, { label: c => T(c), say: lsay, cls: 'let', art: 'a letra' });
+  }
+});
+
+/* ---------------- CONTAR ATÉ 30 ---------------- */
+const numSeq = (a, b) => U.range(a, b).map(v => ({ v, label: String(v), say: nsay(v) }));
+L.register({
+  id: 'fila', title: 'Contar até 30', icon: '💯', color: 'green', area: 'numeros',
+  levels: ['1 a 10', '11 a 20', '21 a 30', '1 a 30'], n: 2,
+  items(level) {
+    const [a, b] = [[1, 10], [11, 20], [21, 30], [1, 30]][level];
+    return [
+      { key: `fila:ordem:${a}-${b}`, a, b },
+      { key: `fila:achar:${level === 3 ? '11-30' : a + '-' + b}`, a: level === 3 ? 11 : a, b, shuffle: true }];
+  },
+  render(it, host, api) {
+    host.classList.add('nm-stage');
+    UI.ask(api, host, it.shuffle
+      ? { text: 'Ache os números na ordem!', say: `Ache os números na ordem. Comece pelo ${nsay(it.a)}.` }
+      : { text: 'Toque e conte!', say: `Vamos contar de ${nsay(it.a)} até ${nsay(it.b)}! Toque em cada número.` });
+    run(api, host, numSeq(it.a, it.b), { num: true, end: it.b === 30 && !it.shuffle ? 'Você contou até trinta!' : '' });
+  }
+});
+})();
+
+</script>
+<script>
+/* ============================================================
+   HISTÓRIAS (originais, escritas para o jogo) + tarefas sobre cada uma.
+   Página: { e: cena em emoji, t: texto (frases curtas) }
+   Tarefas (lv = 0 fácil, 1 médio, 2 leitor):
+     esc: escolher figura   { k:'esc', q, o:[[emoji, 'texto'], …], a: índice certo }
+     num: quantos           { k:'num', q, n, e }
+     ord: ordem dos fatos   { k:'ord', q, s:[[emoji, 'fato'], …] na ordem certa }
+     pal: palavra da história { k:'pal', a:'PALAVRA', d:['ERRADA', 'ERRADA'] }
+     let: letra inicial     { k:'let', w:'NOME', q }
+   ============================================================ */
+(function () {
+const L = window.Cora;
+L.data.STORIES = [
+{
+  id: 'chapeu', title: 'O chapéu da corujinha', cover: '🦉🎩',
+  pages: [
+    { e: '🦉🎩', t: 'A corujinha Cora tinha um chapéu preto, bem bonito. Ela adorava o seu chapéu.' },
+    { e: '🌬️🎩', t: 'Um dia, veio um vento muito forte. O vento levou o chapéu para longe!' },
+    { e: '🦉😢', t: 'A Cora ficou triste. Onde está o meu chapéu?' },
+    { e: '🐰🔍', t: 'O coelho Tom ajudou a procurar. Eles olharam no chão e na beira do rio.' },
+    { e: '🌳🐦', t: 'O chapéu estava em cima da árvore. Dentro dele, um passarinho fez um ninho!' },
+    { e: '🦉💙🐦', t: 'A Cora sorriu. O chapéu virou a casa do passarinho.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Quem perdeu o chapéu?', o: [['🦉', 'a coruja'], ['🐰', 'o coelho'], ['🐶', 'o cachorro']], a: 0 },
+    { lv: 0, k: 'esc', q: 'O que o vento levou?', o: [['🎩', 'o chapéu'], ['👟', 'o sapato'], ['⚽', 'a bola']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Quem ajudou a procurar o chapéu?', o: [['🐰', 'o coelho'], ['🐻', 'o urso'], ['🐸', 'o sapo']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🌬️', 'O vento levou o chapéu'], ['🔍', 'Eles procuraram o chapéu'], ['🐦', 'O passarinho fez um ninho']] },
+    { lv: 2, k: 'esc', q: 'Onde estava o chapéu?', o: [['🌳', 'na árvore'], ['🌊', 'no rio'], ['🏠', 'na casa']], a: 0 },
+    { lv: 2, k: 'pal', a: 'CHAPÉU', d: ['CHAVE', 'CAMA'] },
+    { lv: 2, k: 'let', w: 'CORA', q: 'Com que letra começa o nome da corujinha, Cora?' }
+  ]
+},
+{
+  id: 'bola', title: 'A bola do gato Tito', cover: '🐱⚽',
+  pages: [
+    { e: '🐱⚽', t: 'O gato Tito ganhou uma bola. Ele brincava com a bola o dia todo.' },
+    { e: '⚽💨', t: 'Um dia, a bola rolou, rolou e caiu no lago.' },
+    { e: '🐱😿', t: 'O Tito não sabe nadar. Ele ficou parado na beira do lago.' },
+    { e: '🦆', t: 'Uma pata viu tudo. Ela nadou até a bola.' },
+    { e: '🦆⚽🐱', t: 'A pata empurrou a bola com o bico. A bola voltou para o Tito!' },
+    { e: '🐱🦆💛', t: 'Agora o Tito e a pata brincam juntos. Eles ficaram amigos.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'De quem era a bola?', o: [['🐱', 'do gato'], ['🐶', 'do cachorro'], ['🐰', 'do coelho']], a: 0 },
+    { lv: 0, k: 'esc', q: 'Onde a bola caiu?', o: [['🌊', 'na água do lago'], ['🌳', 'na árvore'], ['🏠', 'dentro de casa']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Quem pegou a bola?', o: [['🦆', 'a pata'], ['🐟', 'o peixe'], ['🐸', 'o sapo']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['⚽', 'O Tito ganhou uma bola'], ['🌊', 'A bola caiu no lago'], ['🦆', 'A pata devolveu a bola']] },
+    { lv: 2, k: 'esc', q: 'O Tito sabe nadar?', o: [['👍', 'sim'], ['👎', 'não']], a: 1 },
+    { lv: 2, k: 'pal', a: 'BOLA', d: ['BOCA', 'BOTA'] },
+    { lv: 2, k: 'let', w: 'TITO', q: 'Com que letra começa o nome do gato, Tito?' }
+  ]
+},
+{
+  id: 'festa', title: 'A festa do sapo Bento', cover: '🐸🎂',
+  pages: [
+    { e: '🐸🎂', t: 'Hoje é o aniversário do sapo Bento. Ele fez um bolo de morango.' },
+    { e: '🐸🎈🎈🎈', t: 'O Bento enfeitou a casa com três balões.' },
+    { e: '🐢🎁', t: 'A tartaruga chegou devagar, com um presente.' },
+    { e: '🐞🐞🎶', t: 'Depois, chegaram duas joaninhas cantando.' },
+    { e: '🐸🕯️🎂', t: 'Todos cantaram parabéns. O Bento soprou a vela.' },
+    { e: '🐸😄', t: 'Foi a festa mais feliz da lagoa!' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'De quem era o aniversário?', o: [['🐸', 'do sapo'], ['🐢', 'da tartaruga'], ['🐞', 'da joaninha']], a: 0 },
+    { lv: 0, k: 'esc', q: 'Qual era o sabor do bolo?', o: [['🍓', 'morango'], ['🍫', 'chocolate'], ['🍋', 'limão']], a: 0 },
+    { lv: 1, k: 'num', q: 'Quantos balões tinha na festa?', n: 3, e: '🎈' },
+    { lv: 1, k: 'num', q: 'Quantas joaninhas chegaram?', n: 2, e: '🐞' },
+    { lv: 2, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🎈', 'O Bento enfeitou a casa'], ['🎁', 'Os amigos chegaram'], ['🕯️', 'O Bento soprou a vela']] },
+    { lv: 2, k: 'pal', a: 'SAPO', d: ['SOPA', 'PATO'] },
+    { lv: 2, k: 'let', w: 'BENTO', q: 'Com que letra começa o nome do sapo, Bento?' }
+  ]
+},
+{
+  id: 'semente', title: 'A semente da Lia', cover: '🌱🌻',
+  pages: [
+    { e: '👧🌱', t: 'A Lia achou uma semente pequenina. Ela plantou a semente num vaso.' },
+    { e: '👧💧', t: 'Todo dia, a Lia dava água para a semente.' },
+    { e: '☀️🪴', t: 'O sol brilhava e esquentava a terra.' },
+    { e: '🌱', t: 'Um dia, nasceu um brotinho verde!' },
+    { e: '🌻', t: 'O brotinho cresceu, cresceu e virou um girassol amarelo.' },
+    { e: '👧🌻😊', t: 'A Lia ficou muito feliz com a sua flor.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'O que a Lia plantou?', o: [['🌱', 'uma semente'], ['🍎', 'uma maçã'], ['⚽', 'uma bola']], a: 0 },
+    { lv: 0, k: 'esc', q: 'Que flor nasceu?', o: [['🌻', 'um girassol'], ['🌹', 'uma rosa'], ['🌷', 'uma tulipa']], a: 0 },
+    { lv: 1, k: 'esc', q: 'O que a Lia dava para a semente todo dia?', o: [['💧', 'água'], ['🥛', 'leite'], ['🍞', 'pão']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🌱', 'A Lia plantou a semente'], ['💧', 'A Lia deu água'], ['🌻', 'Nasceu um girassol']] },
+    { lv: 2, k: 'esc', q: 'De que cor era o girassol?', o: [['🟡', 'amarelo'], ['🔵', 'azul'], ['🟣', 'roxo']], a: 0 },
+    { lv: 2, k: 'pal', a: 'FLOR', d: ['FOGO', 'FADA'] },
+    { lv: 2, k: 'let', w: 'LIA', q: 'Com que letra começa o nome da menina, Lia?' }
+  ]
+},
+{
+  id: 'peixinho', title: 'O peixinho que queria voar', cover: '🐟🐦',
+  pages: [
+    { e: '🐟🌊', t: 'O peixinho Pipo morava no mar. Ele via os passarinhos voando no céu.' },
+    { e: '🐟🐦', t: 'Eu também quero voar! disse o Pipo.' },
+    { e: '🐟💦', t: 'Ele pulou bem alto para fora da água. Mas caiu de novo no mar.' },
+    { e: '🐢🐟', t: 'A tartaruga falou: você não voa, mas nada muito rápido!' },
+    { e: '🐟🐚🐠', t: 'O Pipo nadou pelo mar inteiro. Ele viu conchas e peixes coloridos.' },
+    { e: '🐟😊', t: 'O Pipo aprendeu: cada um tem o seu jeito especial.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Onde o Pipo morava?', o: [['🌊', 'no mar'], ['🌳', 'na floresta'], ['🏠', 'numa casa']], a: 0 },
+    { lv: 0, k: 'esc', q: 'O que o Pipo queria fazer?', o: [['🐦', 'voar'], ['😴', 'dormir'], ['🍰', 'comer bolo']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Quem conversou com o Pipo?', o: [['🐢', 'a tartaruga'], ['🐱', 'o gato'], ['🐵', 'o macaco']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🐦', 'O Pipo viu os passarinhos'], ['💦', 'O Pipo pulou da água'], ['🐢', 'A tartaruga conversou com ele']] },
+    { lv: 2, k: 'esc', q: 'O Pipo conseguiu voar?', o: [['👍', 'sim'], ['👎', 'não']], a: 1 },
+    { lv: 2, k: 'pal', a: 'PEIXE', d: ['PENTE', 'PATO'] },
+    { lv: 2, k: 'let', w: 'PIPO', q: 'Com que letra começa o nome do peixinho, Pipo?' }
+  ]
+},
+{
+  id: 'chuva', title: 'O Dudu e a chuva', cover: '🐶☂️',
+  pages: [
+    { e: '🐶☁️', t: 'O cachorro Dudu queria brincar no quintal. Mas o céu ficou escuro.' },
+    { e: '🌧️', t: 'Começou a chover! Plic, plic, plic.' },
+    { e: '🐶☂️', t: 'O Dudu pegou um guarda-chuva e saiu para brincar.' },
+    { e: '🐶💦', t: 'Ele pulou nas poças de água. Que divertido!' },
+    { e: '🌈', t: 'A chuva parou e apareceu um arco-íris colorido no céu.' },
+    { e: '🐶🛁', t: 'Depois, o Dudu tomou um banho quentinho.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Quem é o Dudu?', o: [['🐶', 'um cachorro'], ['🐱', 'um gato'], ['🐰', 'um coelho']], a: 0 },
+    { lv: 0, k: 'esc', q: 'O que caiu do céu?', o: [['🌧️', 'chuva'], ['❄️', 'neve'], ['🍎', 'maçãs']], a: 0 },
+    { lv: 1, k: 'esc', q: 'O que o Dudu levou para brincar na chuva?', o: [['☂️', 'um guarda-chuva'], ['🎩', 'um chapéu'], ['👓', 'um óculos']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🌧️', 'Começou a chover'], ['💦', 'O Dudu pulou nas poças'], ['🌈', 'Apareceu o arco-íris']] },
+    { lv: 2, k: 'esc', q: 'O que apareceu quando a chuva parou?', o: [['🌈', 'um arco-íris'], ['🌙', 'a lua'], ['⛄', 'um boneco de neve']], a: 0 },
+    { lv: 2, k: 'pal', a: 'CHUVA', d: ['CHAVE', 'LUVA'] },
+    { lv: 2, k: 'let', w: 'DUDU', q: 'Com que letra começa o nome do cachorro, Dudu?' }
+  ]
+},
+{
+  id: 'patinhos', title: 'A pata e os patinhos', cover: '🦆🐥',
+  pages: [
+    { e: '🦆🐥🐥🐥🐥🐥', t: 'A dona Pata tinha cinco patinhos amarelos.' },
+    { e: '🦆🌊', t: 'Um dia, eles foram nadar na lagoa. Um, dois, três, quatro, cinco!' },
+    { e: '🦆❓', t: 'Na volta, a mamãe contou: um, dois, três, quatro. Cadê o quinto patinho?' },
+    { e: '🦆🔍', t: 'Ela procurou atrás da pedra e embaixo das folhas.' },
+    { e: '🐥😴🌼', t: 'O patinho estava dormindo no meio das flores!' },
+    { e: '🦆🐥💛', t: 'A mamãe deu um abraço nele. Todos voltaram juntos para casa.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Quem era a mamãe dos patinhos?', o: [['🦆', 'a pata'], ['🐑', 'a ovelha'], ['🐱', 'a gata']], a: 0 },
+    { lv: 0, k: 'num', q: 'Quantos patinhos a pata tinha?', n: 5, e: '🐥' },
+    { lv: 1, k: 'esc', q: 'Onde estava o patinho que sumiu?', o: [['🌼', 'nas flores'], ['🌊', 'na água'], ['🌳', 'na árvore']], a: 0 },
+    { lv: 1, k: 'esc', q: 'O que o patinho estava fazendo?', o: [['😴', 'dormindo'], ['🍽️', 'comendo'], ['🎵', 'cantando']], a: 0 },
+    { lv: 2, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🌊', 'Eles foram nadar'], ['🔍', 'A mamãe procurou o patinho'], ['💛', 'A mamãe deu um abraço']] },
+    { lv: 2, k: 'pal', a: 'PATO', d: ['GATO', 'MATO'] }
+  ]
+},
+{
+  id: 'praia', title: 'A Nina na praia', cover: '🏖️🏰',
+  pages: [
+    { e: '👧👵🏖️', t: 'A Nina foi à praia com a vovó.' },
+    { e: '🏰', t: 'Elas fizeram um castelo de areia bem grande.' },
+    { e: '🐚🐚🐚🐚', t: 'A Nina achou quatro conchas e enfeitou o castelo.' },
+    { e: '🦀', t: 'Um caranguejo saiu da areia e andou de lado. Que engraçado!' },
+    { e: '🌊🏰', t: 'Veio uma onda e levou o castelo embora.' },
+    { e: '👧👵🍦', t: 'A Nina riu e disse: amanhã a gente faz outro! Depois, elas tomaram sorvete.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Com quem a Nina foi à praia?', o: [['👵', 'com a vovó'], ['👨', 'com o papai'], ['🐶', 'com o cachorro']], a: 0 },
+    { lv: 0, k: 'esc', q: 'O que elas fizeram na areia?', o: [['🏰', 'um castelo'], ['🚗', 'um carro'], ['⛄', 'um boneco']], a: 0 },
+    { lv: 1, k: 'num', q: 'Quantas conchas a Nina achou?', n: 4, e: '🐚' },
+    { lv: 1, k: 'esc', q: 'Que bicho saiu da areia?', o: [['🦀', 'um caranguejo'], ['🐢', 'uma tartaruga'], ['🐟', 'um peixe']], a: 0 },
+    { lv: 2, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🏰', 'Elas fizeram um castelo'], ['🦀', 'Apareceu um caranguejo'], ['🌊', 'A onda levou o castelo']] },
+    { lv: 2, k: 'pal', a: 'PRAIA', d: ['PRATO', 'PALHA'] },
+    { lv: 2, k: 'let', w: 'NINA', q: 'Com que letra começa o nome da menina, Nina?' }
+  ]
+}
+];
+})();
+
+</script>
+<script>
+/* ============================================================
+   HISTÓRIAS — ouvir (e acompanhar a leitura) + tarefas sobre a história
+   ============================================================ */
+(function () {
+'use strict';
+const L = window.Cora, U = L.util, UI = L.ui, h = U.h, T = U.T, D = L.data, ST = L.store;
+const AZ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const strip = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+const sentences = t => t.match(/[^.!?]+[.!?]+/g) || [t];
+
+/* ---------- ouvir a história ---------- */
+function renderStory(it, host, api) {
+  const st = it.st; let p = 0, tok = 0, finished = false;
+  const alive = () => api.item() === it && host.isConnected;
+  host.classList.add('st-stage');
+  const title = h('div', { class: 'st-title' }, T(st.title));
+  const scene = h('div', { class: 'st-scene', role: 'img' });
+  const text = h('div', { class: 'st-text', 'aria-live': 'polite' });
+  const prev = UI.btn('◀', 'c-white round', () => go(p - 1), 'Página anterior');
+  const again = UI.btn('🔊', 'c-violet round', () => read(), 'Ler de novo');
+  const next = UI.btn('▶', 'c-green round', () => go(p + 1), 'Próxima página');
+  const dots = h('div', { class: 'st-dots' });
+  host.append(title, scene, text, h('div', { class: 'row' }, prev, again, next), dots);
+  let spans = [];
+  function show() {
+    const pg = st.pages[p]; scene.textContent = pg.e; scene.classList.remove('in'); void scene.offsetWidth; scene.classList.add('in');
+    text.replaceChildren(); spans = sentences(pg.t).map(sn => {
+      const sp = h('span', { class: 'st-s' });
+      sn.trim().split(/\s+/).forEach((w, i) => {
+        const clean = w.replace(/[.,!?:;]/g, '');
+        const b = h('span', { class: 'st-w' }, (i ? ' ' : '') + T(w));
+        b.onclick = () => { if (!clean) return; tok++; api.speak(clean.toLowerCase()); b.classList.remove('tap'); void b.offsetWidth; b.classList.add('tap'); };
+        sp.append(b);
+      });
+      text.append(sp, ' '); return { sp, say: sn.trim() };
+    });
+    dots.replaceChildren(...st.pages.map((_, i) => h('span', { class: 'dot' + (i < p ? ' on' : i === p ? ' cur' : '') })));
+    prev.disabled = p === 0; prev.style.visibility = p === 0 ? 'hidden' : '';
+    next.textContent = p === st.pages.length - 1 ? '✔' : '▶';
+    read();
+  }
+  async function read() {
+    const my = ++tok; next.classList.remove('next');
+    if (p === 0) { await api.speak(st.title + '.'); if (my !== tok || !alive()) return; }
+    for (let i = 0; i < spans.length; i++) {
+      spans.forEach((s, j) => s.sp.classList.toggle('on', j === i));
+      await api.speak(spans[i].say, { queue: i > 0 || p === 0 });
+      if (my !== tok || !alive()) return;
+    }
+    spans.forEach(s => s.sp.classList.remove('on'));
+    next.classList.add('next');
+  }
+  async function go(i) {
+    if (finished || api.locked()) return;
+    if (i < 0) return;
+    if (i >= st.pages.length) {
+      finished = true; tok++;
+      await api.speak('Fim da história! Agora, vamos ver o que você lembra.');
+      if (alive()) api.correct({ praise: false });
+      return;
+    }
+    p = i; api.sfx.pop(); show();
+  }
+  show();
+}
+
+/* ---------- tarefas ---------- */
+const optEl = (e, w) => h('span', { class: 'st-opt' }, h('span', { class: 'e' }, e), h('span', { class: 'w' }, T(w)));
+function renderTask(it, host, api) {
+  const t = it.t;
+  host.classList.add('st-stage');
+  host.append(h('div', { class: 'st-chip' }, it.cover + ' ' + T(it.title)));
+  if (t.k === 'esc') {
+    UI.ask(api, host, { text: t.q, say: t.q });
+    UI.choices(api, host, {
+      opts: it.opts, label: o => optEl(o.e, o.w), cls: 'st-ch', isRight: o => o.ok,
+      onRight: o => api.speak(`Isso! ${o.w}.`),
+      onWrong: () => api.speak('Hum, não foi isso. Tente de novo!')
+    });
+  } else if (t.k === 'num') {
+    UI.ask(api, host, { text: t.q, say: t.q });
+    UI.choices(api, host, {
+      opts: it.opts, label: x => String(x), cls: 'num', isRight: x => x === t.n,
+      onRight: () => api.speak(`Isso! ${D.NUMS[t.n]}!`),
+      onWrong: () => api.speak('Hum, não foi esse número. Tente de novo!')
+    });
+  } else if (t.k === 'pal') {
+    UI.ask(api, host, { text: 'Qual palavra apareceu na história?', say: 'Qual destas palavras apareceu na história? Leia com calma.' });
+    UI.choices(api, host, {
+      opts: it.opts, label: w => T(w), cls: 'wrd', isRight: w => w === t.a,
+      onRight: w => api.speak(`${w.toLowerCase()}! Muito bem lido!`),
+      onWrong: w => api.speak(`Essa palavra é ${w.toLowerCase()}. Não apareceu na história. Tente de novo!`)
+    });
+  } else if (t.k === 'let') {
+    UI.ask(api, host, { text: t.q, say: t.q });
+    UI.choices(api, host, {
+      opts: it.opts, label: c => T(c), cls: 'let', isRight: c => c === t.w[0],
+      onRight: c => api.speak(`${D.letterSay(c)} de ${t.w.toLowerCase()}!`),
+      onWrong: c => api.speak(`Essa é a letra ${D.letterSay(c)}. Tente de novo!`)
+    });
+  } else if (t.k === 'ord') renderOrder(it, host, api);
+}
+function renderOrder(it, host, api) {
+  const steps = it.t.s; let k = 0, wrongs = 0;
+  UI.ask(api, host, { text: 'Toque na ordem da história!', say: 'O que aconteceu primeiro? Toque nas figuras na ordem da história.' });
+  api.later(() => api.speak('As figuras são: ' + it.opts.map(i => steps[i][1]).join('. ') + '.', { queue: true }), 600);
+  const box = h('div', { class: 'choices st-ord' }), cards = [];
+  it.opts.forEach((si, n) => {
+    const b = h('button', { class: 'b3 choice st-ch k' + (n % 4) }, optEl(steps[si][0], steps[si][1]));
+    b.onclick = () => {
+      if (api.locked() || b.dataset.done) return;
+      if (si === k) {
+        b.dataset.done = 1; b.classList.add('ok'); b.append(h('span', { class: 'st-num' }, String(k + 1)));
+        cards.forEach(c => c.classList.remove('hint')); api.sfx.pop(); api.speak(steps[si][1] + '.'); k++;
+        if (k === steps.length) api.later(() => api.correct(), 500);
+      } else {
+        b.classList.add('no'); api.later(() => b.classList.remove('no'), 420);
+        api.speak(`${steps[si][1]}... Isso aconteceu depois. Tente outra figura!`);
+        wrongs = api.wrong({ chosen: si });
+        if (wrongs >= 2) { api.helped(); cards[it.opts.indexOf(k)].classList.add('hint'); }
+      }
+    };
+    cards.push(b); box.append(b);
+  });
+  host.append(box);
+}
+
+/* ---------- jogo ---------- */
+L.register({
+  id: 'historia', title: 'Histórias', icon: '📚', color: 'teal', area: 'historias',
+  levels: ['Perguntas fáceis', 'Mais perguntas', 'Perguntas de leitor'], n: 6,
+  open() { L.screens.library(); },
+  items(level) {
+    const S = D.STORIES; let st = D._story ? S.find(x => x.id === D._story) : null; D._story = null;
+    if (!st) st = L.srs.pick(S, 1, x => 'historia:' + x.id)[0];
+    const max = [3, 4, 5][level];
+    const idx = st.tasks.map((t, i) => i).filter(i => st.tasks[i].lv <= level);
+    const cur = U.shuffle(idx.filter(i => st.tasks[i].lv === level)), old = U.shuffle(idx.filter(i => st.tasks[i].lv < level));
+    const chosen = [...cur, ...old].slice(0, max).sort((a, b) => st.tasks[a].lv - st.tasks[b].lv || a - b);
+    const tasks = chosen.map(i => {
+      const t = st.tasks[i], it = { kind: 'task', key: `historia:${st.id}:${i}`, t, title: st.title, cover: st.cover };
+      if (t.k === 'esc') it.opts = U.shuffle(t.o.map((o, j) => ({ e: o[0], w: o[1], ok: j === t.a })));
+      if (t.k === 'num') { const c = new Set([t.n]); for (const d of U.shuffle([-2, -1, 1, 2])) { if (c.size >= 3) break; if (t.n + d >= 1 && t.n + d <= 10) c.add(t.n + d); } it.opts = U.shuffle([...c]); }
+      if (t.k === 'pal') it.opts = U.shuffle([t.a, ...t.d]);
+      if (t.k === 'ord') it.opts = U.shuffle(t.s.map((_, j) => j));
+      if (t.k === 'let') {
+        const a = strip(t.w)[0], out = [a];
+        for (const c of U.shuffle(AZ)) { if (out.length >= 3) break; if (!out.some(o => D.confuse(o, c, 0)) && D.firstSound(c) !== D.firstSound(a)) out.push(c); }
+        it.opts = U.shuffle(out);
+      }
+      return it;
+    });
+    return [{ kind: 'story', key: 'historia:' + st.id, st }, ...tasks];
+  },
+  render(it, host, api) { return it.kind === 'story' ? renderStory(it, host, api) : renderTask(it, host, api); }
+});
+
+/* ---------- biblioteca (escolher a história) ---------- */
+L.screens.library = function () {
+  L.engine.leave();
+  const read = st => ((ST.s.skill['historia:' + st.id] || {}).ok || 0) > 0;
+  const card = st => h('button', { class: 'b3 card st-book c-' + ['teal', 'blue', 'violet', 'pink', 'green', 'orange'][D.STORIES.indexOf(st) % 6],
+    'aria-label': st.title, onclick: () => { D._story = st.id; L.sfx.pop(); L.play('historia'); } },
+    h('span', { class: 'ico' }, st.cover), h('span', { class: 'lbl' }, st.title), h('span', { class: 'lvl' }, read(st) ? '✔ já ouvi' : '✨ nova'));
+  L.screens.mount(h('div', { class: 'screen menu t-teal' },
+    h('div', { class: 'mhead' }, h('button', { class: 'b3 round c-white', 'aria-label': 'Voltar ao menu', onclick: () => L.screens.menu() }, '🏠'),
+      h('div', { class: 'grow' }, h('h1', {}, '📚 Histórias'))),
+    h('div', { class: 'grid' }, D.STORIES.map(card))));
+  L.tts.say('Escolha uma história para ouvir!');
+};
 })();
 
 </script>
