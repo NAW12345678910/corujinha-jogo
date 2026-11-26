@@ -435,6 +435,10 @@ h1,h2,h3,p{margin:0}
 .st-book .ico{letter-spacing:-.6vmin}
 @media (max-height:520px){.st-scene{font-size:min(14vmin,18vw)}.st-text{font-size:max(4vmin,17px);padding:1.4vmin 2.6vmin}}
 
+.od-line{display:flex;flex-wrap:wrap;gap:.8vmin;justify-content:center;max-width:min(96vw,900px)}
+.od-slot{min-width:max(6.4vmin,30px);height:max(6.4vmin,30px);border-radius:1.6vmin;border:.4vmin dashed #b9a8ef;background:rgba(255,255,255,.6);display:grid;place-items:center;font-weight:800;font-family:var(--title);font-size:max(3.4vmin,15px)}
+.od-slot.on{border:.4vmin solid #22c55e;background:#fff;color:#0d7650;animation:pop .4s}
+
 </style>
 <script>window.LARA_PUBLIC=true</script>
 <link rel="manifest" href="manifest.webmanifest">
@@ -2934,6 +2938,8 @@ const nsay = n => D.NUMS[n];
 function run(api, host, seq, o) {
   const grid = h('div', { class: 'od-grid' + (seq.length > 15 ? ' many' : '') + (o.num ? ' num' : '') });
   const btns = new Map(); let k = 0, wrongs = 0;
+  const line = o.shuffle ? h('div', { class: 'od-line' }, seq.map(() => h('span', { class: 'od-slot' }))) : null;
+  if (line) host.append(line);
   (o.shuffle ? U.shuffle(seq) : seq).forEach(it => {
     const b = h('button', { class: 'b3 od-cell', 'aria-label': it.say }, it.label);
     b.onclick = () => tap(it, b); btns.set(it, b); grid.append(b);
@@ -2944,7 +2950,9 @@ function run(api, host, seq, o) {
   function tap(it, b) {
     if (api.locked() || b.classList.contains('done')) return;
     if (it === seq[k]) {
-      b.classList.add('done'); api.sfx.tick(k % 8); api.speak(it.say); k++; mark();
+      b.classList.add('done'); api.sfx.tick(k % 8); api.speak(it.say);
+      if (line) { const sl = line.children[k]; sl.textContent = it.label; sl.classList.add('on'); }
+      k++; mark();
       if (k === seq.length) api.later(() => { if (o.end) api.speak(o.end, { queue: true }); api.correct({ manual: true }); }, 500);
     } else {
       b.classList.add('no'); api.later(() => b.classList.remove('no'), 420);
@@ -3009,7 +3017,7 @@ L.register({
       UI.ask(api, host, it.shuffle
         ? { text: 'Ache as letras na ordem!', say: `Ache as letras na ordem do alfabeto. Comece pela letra ${first}.` }
         : { text: 'Toque nas letras em ordem!', say: `Vamos falar o alfabeto! Toque em cada letra, começando pela letra ${first}.` });
-      run(api, host, letterSeq(it.seq), { end: it.seq.length === 26 ? 'Você falou o alfabeto inteiro!' : '' });
+      run(api, host, letterSeq(it.seq), { shuffle: !!it.shuffle, end: it.seq.length === 26 ? 'Você falou o alfabeto inteiro!' : '' });
       return;
     }
     UI.ask(api, host, it.kind === 'depois'
@@ -3024,18 +3032,17 @@ const numSeq = (a, b) => U.range(a, b).map(v => ({ v, label: String(v), say: nsa
 L.register({
   id: 'fila', title: 'Contar até 30', icon: '💯', color: 'green', area: 'numeros',
   levels: ['1 a 10', '11 a 20', '21 a 30', '1 a 30'], n: 2,
-  items(level) {
+  items(level) {                                            // sempre embaralhados: ela coloca em ordem
     const [a, b] = [[1, 10], [11, 20], [21, 30], [1, 30]][level];
-    return [
-      { key: `fila:ordem:${a}-${b}`, a, b },
-      { key: `fila:achar:${level === 3 ? '11-30' : a + '-' + b}`, a: level === 3 ? 11 : a, b, shuffle: true }];
+    if (level === 3) return [{ key: 'fila:1-30', a: 1, b: 30, shuffle: true }];
+    return [{ key: `fila:${a}-${b}:1`, a, b, shuffle: true }, { key: `fila:${a}-${b}:2`, a, b, shuffle: true }];
   },
   render(it, host, api) {
     host.classList.add('nm-stage');
     UI.ask(api, host, it.shuffle
-      ? { text: 'Ache os números na ordem!', say: `Ache os números na ordem. Comece pelo ${nsay(it.a)}.` }
+      ? { text: 'Coloque os números em ordem!', say: `Coloque os números em ordem, de ${nsay(it.a)} até ${nsay(it.b)}. Comece pelo ${nsay(it.a)}.` }
       : { text: 'Toque e conte!', say: `Vamos contar de ${nsay(it.a)} até ${nsay(it.b)}! Toque em cada número.` });
-    run(api, host, numSeq(it.a, it.b), { num: true, end: it.b === 30 && !it.shuffle ? 'Você contou até trinta!' : '' });
+    run(api, host, numSeq(it.a, it.b), { num: true, shuffle: !!it.shuffle, end: it.b === 30 ? 'Você contou até trinta!' : '' });
   }
 });
 })();
@@ -3055,6 +3062,134 @@ L.register({
 (function () {
 const L = window.Cora;
 L.data.STORIES = [
+/* ---- contos clássicos (domínio público), em versão suave para crianças pequenas ---- */
+{
+  id: 'chapeuzinho', title: 'Chapeuzinho Vermelho', cover: '👧🧺',
+  pages: [
+    { e: '👧🧺', t: 'Era uma vez uma menina que usava uma capa vermelha. Todos a chamavam de Chapeuzinho Vermelho.' },
+    { e: '👩🧺🍪', t: 'A mamãe pediu: leve esta cesta de bolinhos para a vovó. E não converse com estranhos!' },
+    { e: '🌳🐺', t: 'No caminho da floresta, apareceu um lobo. Ele perguntou: aonde você vai, menina?' },
+    { e: '🐺🏠', t: 'O lobo correu na frente e chegou primeiro à casa da vovó. A vovó tinha saído, e o lobo deitou na cama dela.' },
+    { e: '👧🐺', t: 'Vovó, que olhos grandes você tem! É para te ver melhor, disse o lobo. Vovó, que boca grande você tem!' },
+    { e: '👨🪓🐺💨', t: 'Um lenhador ouviu o barulho e espantou o lobo para bem longe.' },
+    { e: '👵👧🍪', t: 'A vovó voltou, e todos comeram os bolinhos juntos. Chapeuzinho aprendeu a não conversar com estranhos.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'De que cor era a capa da menina?', o: [['🔴', 'vermelha'], ['🔵', 'azul'], ['🟢', 'verde']], a: 0 },
+    { lv: 0, k: 'esc', q: 'Quem a menina encontrou na floresta?', o: [['🐺', 'o lobo'], ['🐻', 'o urso'], ['🐰', 'o coelho']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Para quem era a cesta de bolinhos?', o: [['👵', 'para a vovó'], ['👨', 'para o lenhador'], ['🐺', 'para o lobo']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🧺', 'A mamãe deu a cesta'], ['🐺', 'O lobo apareceu'], ['🪓', 'O lenhador espantou o lobo']] },
+    { lv: 2, k: 'esc', q: 'O que a mamãe disse para não fazer?', o: [['🗣️', 'conversar com estranhos'], ['🍪', 'comer bolinhos'], ['😴', 'dormir']], a: 0 },
+    { lv: 2, k: 'pal', a: 'LOBO', d: ['LOJA', 'BOLO'] },
+    { lv: 2, k: 'let', w: 'LOBO', q: 'Com que letra começa a palavra lobo?' }
+  ]
+},
+{
+  id: 'branca', title: 'Branca de Neve', cover: '👸🍎',
+  pages: [
+    { e: '👸🏰', t: 'Era uma vez uma princesa de pele branquinha como a neve. O nome dela era Branca de Neve.' },
+    { e: '👑🪞', t: 'A rainha tinha um espelho mágico. Ela tinha muita inveja da Branca de Neve.' },
+    { e: '👸🌳', t: 'Branca de Neve fugiu para a floresta e achou uma casinha bem pequena.' },
+    { e: '🏠⛏️', t: 'Na casinha moravam sete anõezinhos. Eles trabalhavam numa mina e ficaram amigos dela.' },
+    { e: '👵🍎', t: 'Um dia, a rainha, disfarçada de velhinha, deu uma maçã encantada para a Branca de Neve. Ela mordeu e dormiu um sono profundo.' },
+    { e: '🤴✨', t: 'Um príncipe chegou, o feitiço se quebrou, e a Branca de Neve acordou.' },
+    { e: '👸🤴🎉', t: 'Os anõezinhos fizeram uma grande festa. E todos viveram felizes.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Que fruta a rainha deu para a Branca de Neve?', o: [['🍎', 'uma maçã'], ['🍌', 'uma banana'], ['🍇', 'uma uva']], a: 0 },
+    { lv: 0, k: 'esc', q: 'O que a rainha tinha de mágico?', o: [['🪞', 'um espelho'], ['🎩', 'um chapéu'], ['🧹', 'uma vassoura']], a: 0 },
+    { lv: 1, k: 'num', q: 'Quantos anõezinhos moravam na casinha?', n: 7, e: '⛏️' },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🌳', 'Ela fugiu para a floresta'], ['🍎', 'Ela mordeu a maçã'], ['🎉', 'Fizeram uma festa']] },
+    { lv: 2, k: 'esc', q: 'Onde os anõezinhos trabalhavam?', o: [['⛏️', 'numa mina'], ['🏫', 'numa escola'], ['🏪', 'numa loja']], a: 0 },
+    { lv: 2, k: 'pal', a: 'MAÇÃ', d: ['MALA', 'MAPA'] },
+    { lv: 2, k: 'let', w: 'BRANCA', q: 'Com que letra começa o nome Branca?' }
+  ]
+},
+{
+  id: 'adormecida', title: 'A Bela Adormecida', cover: '👸💤',
+  pages: [
+    { e: '👑👶', t: 'Um rei e uma rainha tiveram uma filhinha. Eles fizeram uma grande festa.' },
+    { e: '🧚🧚🧚', t: 'Três fadas deram presentes para a princesa: beleza, alegria e uma voz bonita.' },
+    { e: '🧙‍♀️', t: 'Mas uma fada brava, que não foi convidada, fez um feitiço: um dia, a princesa vai furar o dedo e dormir.' },
+    { e: '👸🪡💤', t: 'Quando a princesa cresceu, ela furou o dedo numa agulha e dormiu um sono muito longo.' },
+    { e: '🏰🌹', t: 'O castelo inteiro dormiu, e uma floresta de rosas cresceu em volta.' },
+    { e: '🤴🌹', t: 'Muitos anos depois, um príncipe corajoso passou pelas rosas e chegou até a princesa.' },
+    { e: '👸🤴😊', t: 'A princesa acordou, o castelo acordou, e todos fizeram uma festa.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Quem dormiu um sono muito longo?', o: [['👸', 'a princesa'], ['🐶', 'o cachorro'], ['👑', 'o rei']], a: 0 },
+    { lv: 0, k: 'esc', q: 'O que cresceu em volta do castelo?', o: [['🌹', 'rosas'], ['🍎', 'maçãs'], ['🌵', 'cactos']], a: 0 },
+    { lv: 1, k: 'num', q: 'Quantas fadas deram presentes?', n: 3, e: '🧚' },
+    { lv: 1, k: 'esc', q: 'Onde a princesa furou o dedo?', o: [['🪡', 'numa agulha'], ['🍴', 'num garfo'], ['✏️', 'num lápis']], a: 0 },
+    { lv: 2, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🧚', 'As fadas deram presentes'], ['💤', 'A princesa dormiu'], ['🤴', 'O príncipe chegou']] },
+    { lv: 2, k: 'pal', a: 'ROSA', d: ['RODA', 'ROUPA'] },
+    { lv: 2, k: 'let', w: 'FADA', q: 'Com que letra começa a palavra fada?' }
+  ]
+},
+{
+  id: 'belafera', title: 'A Bela e a Fera', cover: '👧🦁',
+  pages: [
+    { e: '👧📚', t: 'Bela era uma moça que adorava ler livros.' },
+    { e: '👴🌲🏰', t: 'Um dia, o pai dela se perdeu na floresta e entrou num castelo escuro.' },
+    { e: '🦁🏰', t: 'No castelo morava uma Fera, grande e peluda. A Fera ficou brava com o pai da Bela.' },
+    { e: '👧🦁', t: 'Bela foi ao castelo no lugar do pai. No começo, ela teve medo da Fera.' },
+    { e: '📚🦁💃', t: 'Mas a Fera era gentil. Eles leram livros e dançaram juntos. Viraram grandes amigos.' },
+    { e: '🌹✨🤴', t: 'Bela disse: eu gosto muito de você. Então, a Fera virou um príncipe! Era um feitiço.' },
+    { e: '👸🤴💛', t: 'Bela aprendeu que o mais importante é o que a gente tem no coração.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'O que a Bela adorava fazer?', o: [['📚', 'ler livros'], ['⚽', 'jogar bola'], ['🎨', 'pintar']], a: 0 },
+    { lv: 0, k: 'esc', q: 'Onde morava a Fera?', o: [['🏰', 'num castelo'], ['⛺', 'numa barraca'], ['🚢', 'num navio']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Quem se perdeu na floresta?', o: [['👴', 'o pai da Bela'], ['👵', 'a vovó'], ['🐶', 'o cachorro']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Em quem a Fera se transformou?', o: [['🤴', 'num príncipe'], ['🐸', 'num sapo'], ['🐦', 'num passarinho']], a: 0 },
+    { lv: 2, k: 'ord', q: 'O que aconteceu primeiro?', s: [['👴', 'O pai se perdeu'], ['📚', 'Bela e a Fera ficaram amigos'], ['🤴', 'A Fera virou príncipe']] },
+    { lv: 2, k: 'pal', a: 'LIVRO', d: ['LIXO', 'LINDO'] },
+    { lv: 2, k: 'let', w: 'BELA', q: 'Com que letra começa o nome Bela?' }
+  ]
+},
+{
+  id: 'rapunzel', title: 'Rapunzel', cover: '👸🏰',
+  pages: [
+    { e: '👸', t: 'Rapunzel era uma menina de cabelo comprido, muito comprido.' },
+    { e: '🧙‍♀️🏰', t: 'Uma bruxa guardava a Rapunzel numa torre alta, sem porta e sem escada.' },
+    { e: '🧙‍♀️🏰', t: 'Para subir, a bruxa gritava: Rapunzel, jogue as suas tranças! E subia pelo cabelo dela.' },
+    { e: '👸🎶🐦', t: 'Rapunzel passava os dias cantando com os passarinhos na janela.' },
+    { e: '🤴🐴', t: 'Um dia, um príncipe ouviu a canção. Ele chamou: Rapunzel, jogue as suas tranças!' },
+    { e: '🤴👸', t: 'Eles ficaram amigos, e o príncipe ajudou a Rapunzel a sair da torre.' },
+    { e: '👸🌼😊', t: 'Rapunzel correu pelos campos de flores. Finalmente, ela estava livre!' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Quem guardava a Rapunzel na torre?', o: [['🧙‍♀️', 'uma bruxa'], ['🐉', 'um dragão'], ['👑', 'um rei']], a: 0 },
+    { lv: 0, k: 'esc', q: 'Com quem a Rapunzel cantava na janela?', o: [['🐦', 'com os passarinhos'], ['🐸', 'com os sapos'], ['🐶', 'com os cachorros']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Por onde a bruxa subia na torre?', o: [['👸', 'pelo cabelo da Rapunzel'], ['🪜', 'por uma escada'], ['🚪', 'por uma porta']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['🧙‍♀️', 'A bruxa guardou Rapunzel na torre'], ['🎶', 'O príncipe ouviu a canção'], ['🌼', 'Rapunzel ficou livre']] },
+    { lv: 2, k: 'esc', q: 'A torre tinha porta?', o: [['👍', 'sim'], ['👎', 'não']], a: 1 },
+    { lv: 2, k: 'pal', a: 'TORRE', d: ['TORTA', 'TERRA'] },
+    { lv: 2, k: 'let', w: 'RAPUNZEL', q: 'Com que letra começa o nome Rapunzel?' }
+  ]
+},
+{
+  id: 'rainhaneve', title: 'A Rainha da Neve', cover: '❄️👸',
+  pages: [
+    { e: '👧👦🌹', t: 'Gerda e Kai eram melhores amigos. No verão, eles cuidavam de um jardim de rosas.' },
+    { e: '❄️👦', t: 'No inverno, um pedacinho de gelo mágico entrou no olho do Kai. Ele ficou frio e triste.' },
+    { e: '👸❄️🛷', t: 'A Rainha da Neve passou num trenó branco e levou o Kai para o castelo de gelo.' },
+    { e: '👧🦌', t: 'Gerda foi procurar o amigo. Uma rena muito boa levou a Gerda pela neve.' },
+    { e: '🏰❄️👦', t: 'No castelo de gelo, Gerda achou o Kai, sentado e gelado.' },
+    { e: '👧🤗👦', t: 'Gerda deu um abraço bem quentinho no Kai. O gelo derreteu, e ele sorriu de novo!' },
+    { e: '🌹☀️', t: 'Os dois voltaram para casa, e as rosas floresceram outra vez.' }
+  ],
+  tasks: [
+    { lv: 0, k: 'esc', q: 'Quem levou o Kai?', o: [['👸', 'a Rainha da Neve'], ['🐺', 'o lobo'], ['🧙‍♀️', 'a bruxa']], a: 0 },
+    { lv: 0, k: 'esc', q: 'Que animal ajudou a Gerda?', o: [['🦌', 'a rena'], ['🐱', 'o gato'], ['🐸', 'o sapo']], a: 0 },
+    { lv: 1, k: 'esc', q: 'Do que era feito o castelo?', o: [['❄️', 'de gelo'], ['🍫', 'de chocolate'], ['🪵', 'de madeira']], a: 0 },
+    { lv: 1, k: 'ord', q: 'O que aconteceu primeiro?', s: [['❄️', 'O gelo entrou no olho do Kai'], ['🦌', 'A rena levou a Gerda'], ['🤗', 'Gerda abraçou o Kai']] },
+    { lv: 2, k: 'esc', q: 'O que derreteu o gelo do Kai?', o: [['🤗', 'um abraço quentinho'], ['🔥', 'uma fogueira'], ['🍵', 'um chá']], a: 0 },
+    { lv: 2, k: 'pal', a: 'NEVE', d: ['NAVE', 'NOVE'] },
+    { lv: 2, k: 'let', w: 'GERDA', q: 'Com que letra começa o nome Gerda?' }
+  ]
+},
+/* ---- histórias originais ---- */
 {
   id: 'chapeu', title: 'O chapéu da corujinha', cover: '🦉🎩',
   pages: [
